@@ -1,0 +1,7 @@
+*.proto
+*.class
+*.exe
+*.lst
+.DS_Store
+*.properties
+*.jar
