@@ -55,58 +55,66 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 
     @Override
     public void committx(DadkvsMain.CommitRequest request, StreamObserver<DadkvsMain.CommitReply> responseObserver) {
+		// this is used to create the stubs only once whenever all the servers are up, its put here to avoid servers being down
 		if(!stubs_created){
 			this.stubs_created = true;
 			this.initComms();
 		}
-	// for debug purposes
-	System.out.println("Receiving commit request:" + request);
-	server_state.responseObserver.put(request.getReqid(),responseObserver); // StreamObserver<DadkvsMain.CommitReply> responseObserver
-	// se for o lider e nao tiver o valor na queue
+
+		// for debug purposes
+		System.out.println("Receiving commit request:" + request);
+
+		// used to be able to reply to client once the commit message is processed(afer "consensus")
+		server_state.responseObserver.put(request.getReqid(),responseObserver);
+		// O request e adicionado depois para evitar varios requests iguais comecarem varias instancias de consenso
+
+
+		// se for o lider e nao tiver o valor na queue
 		// sistema de locks? tem que ser feito syncronize
-	if(server_state.i_am_leader && !server_state.request_list.containsKey(request.getReqid())){
-		// acrescenta o request a hash table
-		server_state.request_list.put(request.getReqid(),request);
-		// incrementa o timestamp
-		this.timestamp++;
-		// cria a mensagem da phase 2
-		DadkvsPaxos.PhaseTwoRequest.Builder phase_two_request = DadkvsPaxos.PhaseTwoRequest.newBuilder();
-			phase_two_request.setPhase2Config(this.config)
-					.setPhase2Index(request.getReqid())
-					.setPhase2Value(this.timestamp)
-					.setPhase2Timestamp(this.timestamp).build();
+		if(server_state.i_am_leader && !server_state.request_list.containsKey(request.getReqid())){
+			// acrescenta o request a hash table
+			server_state.request_list.put(request.getReqid(),request);
+			// incrementa o timestamp
+			this.timestamp++;
+			// cria a mensagem da phase 2
+			DadkvsPaxos.PhaseTwoRequest.Builder phase_two_request = DadkvsPaxos.PhaseTwoRequest.newBuilder();
+				phase_two_request.setPhase2Config(this.config)
+						.setPhase2Index(request.getReqid())
+						.setPhase2Value(this.timestamp)
+						.setPhase2Timestamp(this.timestamp).build();
 
 
-		int n_servers = 5;
-		// coisas que deviam estar numa funcao para enviar mensagens e esperar receber respostas
-		ArrayList<DadkvsPaxos.PhaseTwoReply> phase_two_responses = new ArrayList<DadkvsPaxos.PhaseTwoReply>();
-		GenericResponseCollector<DadkvsPaxos.PhaseTwoReply> phase_two_collector = new GenericResponseCollector<DadkvsPaxos.PhaseTwoReply> (phase_two_responses, n_servers);
+			int n_servers = 5;
 
-		for (int i = 0; i < n_servers; i++) {
-			CollectorStreamObserver<DadkvsPaxos.PhaseTwoReply> phase_two_observer = new CollectorStreamObserver<DadkvsPaxos.PhaseTwoReply>(phase_two_collector);
 
-			async_stubs[i].phasetwo(phase_two_request.build(), phase_two_observer);
-		}
+			// coisas que deviam estar numa funcao para enviar mensagens e esperar receber respostas, tudo copiado e adaptado do client
+			ArrayList<DadkvsPaxos.PhaseTwoReply> phase_two_responses = new ArrayList<DadkvsPaxos.PhaseTwoReply>();
+			GenericResponseCollector<DadkvsPaxos.PhaseTwoReply> phase_two_collector = new GenericResponseCollector<DadkvsPaxos.PhaseTwoReply> (phase_two_responses, n_servers);
 
-		int responses_needed = n_servers;
-		phase_two_collector.waitForTarget(responses_needed);
-		if (phase_two_responses.size() >= responses_needed) {
-			Iterator<DadkvsPaxos.PhaseTwoReply> phase_two_iterator = phase_two_responses.iterator();
-			DadkvsPaxos.PhaseTwoReply phase_two_reply = phase_two_iterator.next ();
-			System.out.println("Reqid = " + request.getReqid() + " index in reply = " + phase_two_reply.getPhase2Index());
-			boolean result = phase_two_reply.getPhase2Accepted();
-			if (result) {
-				System.out.println("phase_two index " + phase_two_request.getPhase2Index() + " with value " + phase_two_request.getPhase2Value());
-			} else {
-				System.out.println("phase_two Failed");
+			for (int i = 0; i < n_servers; i++) {
+				CollectorStreamObserver<DadkvsPaxos.PhaseTwoReply> phase_two_observer = new CollectorStreamObserver<DadkvsPaxos.PhaseTwoReply>(phase_two_collector);
+				async_stubs[i].phasetwo(phase_two_request.build(), phase_two_observer);
 			}
+
+			int responses_needed = n_servers;  // aqui disse que o lider espera receber mensagens de todos, no futuro sera da maioria acho eu
+			phase_two_collector.waitForTarget(responses_needed);
+			if (phase_two_responses.size() >= responses_needed) {
+				Iterator<DadkvsPaxos.PhaseTwoReply> phase_two_iterator = phase_two_responses.iterator();
+				DadkvsPaxos.PhaseTwoReply phase_two_reply = phase_two_iterator.next ();
+				System.out.println("Reqid = " + request.getReqid() + " index in reply = " + phase_two_reply.getPhase2Index());
+				boolean result = phase_two_reply.getPhase2Accepted();
+				if (result) {
+					System.out.println("phase_two index " + phase_two_request.getPhase2Index() + " with value " + phase_two_request.getPhase2Value());
+				} else {
+					System.out.println("phase_two Failed");
+				}
+			}
+			else
+				System.out.println("Panic...error phase_two ing");
 		}
-		else
-			System.out.println("Panic...error phase_two ing");
-	}
-	else{
-		server_state.request_list.put(request.getReqid(),request);
-	}
+		else{
+			server_state.request_list.put(request.getReqid(),request);
+		}
 
 		/*
 		* message PhaseTwoRequest {
@@ -123,6 +131,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 
 
 
+	// server para inciar os stubs basicamente, igual ao do client mas tmb faco os enderecos ai pq faz mais sentido
 	private void initComms () {
 		int n_servers = 5;
 		String[] targets;

@@ -42,8 +42,11 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     public void phasetwo(DadkvsPaxos.PhaseTwoRequest p2request, StreamObserver<DadkvsPaxos.PhaseTwoReply> responseObserver) {
         // for debug purposes
         System.out.println ("Receive phase two request: " + p2request);
+        // get reqid from the phase 2 request sent by the leader
         int reqid = p2request.getPhase2Index();
+        // get the request we already magicly have(to be fixed)...   This may be null
         DadkvsMain.CommitRequest request = server_state.request_list.get(reqid);
+
 
         int key1 = request.getKey1();
         int version1 = request.getVersion1();
@@ -64,17 +67,22 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
         // for debug purposes
         System.out.println("Result is ready for request with reqid " + reqid);
 
+
+        // create commit message to send to client
         DadkvsMain.CommitReply response =DadkvsMain.CommitReply.newBuilder()
                 .setReqid(reqid).setAck(result).build();
-
+        // send commit reply to client
         server_state.responseObserver.get(reqid).onNext(response);
         server_state.responseObserver.get(reqid).onCompleted();
 
+
+        // build phase 2 reply message
         DadkvsPaxos.PhaseTwoReply phase_two_reply = DadkvsPaxos.PhaseTwoReply.newBuilder()
                 .setPhase2Config(0)     // config is 0
                 .setPhase2Index(reqid)
                 .setPhase2Accepted(result).build();
 
+        // send phase two reply
         responseObserver.onNext(phase_two_reply);
         responseObserver.onCompleted();
     }
