@@ -17,14 +17,16 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 
+import dadkvs.util.GenericResponseCollector;
+import dadkvs.util.CollectorStreamObserver;
 public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosServiceImplBase {
 
 
     DadkvsServerState server_state;
     
-    
     public DadkvsPaxosServiceImpl(DadkvsServerState state) {
 	this.server_state = state;
+        int config = 0;   // config is 0 for now, when we add it we can change it
 	
     }
     
@@ -37,10 +39,44 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     }
 
     @Override
-    public void phasetwo(DadkvsPaxos.PhaseTwoRequest request, StreamObserver<DadkvsPaxos.PhaseTwoReply> responseObserver) {
-	// for debug purposes
-	System.out.println ("Receive phase two request: " + request);
+    public void phasetwo(DadkvsPaxos.PhaseTwoRequest p2request, StreamObserver<DadkvsPaxos.PhaseTwoReply> responseObserver) {
+        // for debug purposes
+        System.out.println ("Receive phase two request: " + p2request);
+        int reqid = p2request.getPhase2Index();
+        DadkvsMain.CommitRequest request = server_state.request_list.get(reqid);
 
+        int key1 = request.getKey1();
+        int version1 = request.getVersion1();
+        int key2 = request.getKey2();
+        int version2 = request.getVersion2();
+        int writekey = request.getWritekey();
+        int writeval = request.getWriteval();
+
+        // for debug purposes
+        System.out.println("reqid " + reqid + " key1 " + key1 + " v1 " + version1 + " k2 " + key2 + " v2 " + version2 + " wk " + writekey + " writeval " + writeval);
+
+        // append pedido a lista
+        // this.timestamp++;  so interessa para o ldier
+        TransactionRecord txrecord = new TransactionRecord (key1, version1, key2, version2, writekey, writeval, p2request.getPhase2Timestamp());
+        boolean result = this.server_state.store.commit (txrecord);
+
+
+        // for debug purposes
+        System.out.println("Result is ready for request with reqid " + reqid);
+
+        DadkvsMain.CommitReply response =DadkvsMain.CommitReply.newBuilder()
+                .setReqid(reqid).setAck(result).build();
+
+        server_state.responseObserver.get(reqid).onNext(response);
+        server_state.responseObserver.get(reqid).onCompleted();
+
+        DadkvsPaxos.PhaseTwoReply phase_two_reply = DadkvsPaxos.PhaseTwoReply.newBuilder()
+                .setPhase2Config(0)     // config is 0
+                .setPhase2Index(reqid)
+                .setPhase2Accepted(result).build();
+
+        responseObserver.onNext(phase_two_reply);
+        responseObserver.onCompleted();
     }
 
     @Override

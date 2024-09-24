@@ -1,5 +1,9 @@
 package dadkvs.server;
-
+import dadkvs.DadkvsMain;
+import dadkvs.DadkvsMainServiceGrpc;
+import java.util.HashMap;
+import java.util.Map;
+import io.grpc.stub.StreamObserver;
 public class DadkvsServerState {
     boolean        i_am_leader;
     int            debug_mode;
@@ -9,7 +13,8 @@ public class DadkvsServerState {
     KeyValueStore  store;
     MainLoop       main_loop;
     Thread         main_loop_worker;
-
+    Map<Integer, DadkvsMain.CommitRequest> request_list;
+    Map<Integer, StreamObserver<DadkvsMain.CommitReply>> responseObserver;
     
     public DadkvsServerState(int kv_size, int port, int myself) {
 	base_port = port;
@@ -21,5 +26,7 @@ public class DadkvsServerState {
 	main_loop = new MainLoop(this);
 	main_loop_worker = new Thread (main_loop);
 	main_loop_worker.start();
+    request_list = new HashMap<Integer,DadkvsMain.CommitRequest>();
+    responseObserver = new HashMap<Integer,StreamObserver<DadkvsMain.CommitReply>>();
     }
 }
