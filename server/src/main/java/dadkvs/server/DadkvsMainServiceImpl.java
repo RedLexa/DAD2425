@@ -28,8 +28,8 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
     int config = 0;   // config is 0 for now, when we add it we can change it
     public DadkvsMainServiceImpl(DadkvsServerState state) {
         this.server_state = state;
-	this.timestamp = 0;
-	this.stubs_created = false;
+		this.timestamp = 0;
+		this.stubs_created = false;
     }
 
     @Override
@@ -55,6 +55,10 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 
     @Override
     public void committx(DadkvsMain.CommitRequest request, StreamObserver<DadkvsMain.CommitReply> responseObserver) {
+
+		// TODO: add if para ver se tem um phase 2 do mesmo seq number para dar match
+
+
 		// this is used to create the stubs only once whenever all the servers are up, its put here to avoid servers being down
 		if(!stubs_created){
 			this.stubs_created = true;
@@ -75,7 +79,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 			// acrescenta o request a hash table
 			server_state.request_list.put(request.getReqid(),request);
 			// incrementa o timestamp
-			this.timestamp++;
+			this.timestamp++;  // 1 -> 2 -> 3 -> 4
 			// cria a mensagem da phase 2
 			DadkvsPaxos.PhaseTwoRequest.Builder phase_two_request = DadkvsPaxos.PhaseTwoRequest.newBuilder();
 				phase_two_request.setPhase2Config(this.config)
@@ -116,14 +120,6 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 			server_state.request_list.put(request.getReqid(),request);
 		}
 
-		/*
-		* message PhaseTwoRequest {
-  int32 phase2config    = 1;
-  int32 phase2index     = 2;
-  int32 phase2value     = 3;
-  int32 phase2timestamp = 4;
-}
-* */
     }
 	//received seq number
 	//colocar o pedido de maneira ordenada num tree map, associado ao req id

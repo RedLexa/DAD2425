@@ -17,7 +17,7 @@ public class DadkvsServerState {
     Map<Integer, DadkvsMain.CommitRequest> request_list;
     Map<Integer, StreamObserver<DadkvsMain.CommitReply>> responseObserver;
 
-    Map<Integer, TransactionRecord> transactions_commited;
+    Map<Integer, DadkvsPaxos.PhaseTwoRequest> phase_two_requests;
 
     Map<Integer,StreamObserver<DadkvsPaxos.PhaseTwoReply>> phase2Observer;
 
@@ -37,7 +37,7 @@ public class DadkvsServerState {
         main_loop_worker.start();
         request_list = new HashMap<Integer,DadkvsMain.CommitRequest>();
         responseObserver = new HashMap<Integer,StreamObserver<DadkvsMain.CommitReply>>();
-        transactions_commited = new HashMap<Integer, TransactionRecord>();
+        phase_two_requests = new HashMap<Integer, DadkvsPaxos.PhaseTwoRequest>();
         phase2Observer = new HashMap<Integer,StreamObserver<DadkvsPaxos.PhaseTwoReply>>();
     }
 }
