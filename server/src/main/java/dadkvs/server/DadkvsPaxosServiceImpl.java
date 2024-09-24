@@ -44,6 +44,8 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
         System.out.println ("Receive phase two request: " + p2request);
         // get reqid from the phase 2 request sent by the leader
         int reqid = p2request.getPhase2Index();
+        this.server_state.phase2Observer.put(reqid,responseObserver);
+
         // get the request we already magicly have(to be fixed)...   This may be null
         DadkvsMain.CommitRequest request = server_state.request_list.get(reqid);
 
