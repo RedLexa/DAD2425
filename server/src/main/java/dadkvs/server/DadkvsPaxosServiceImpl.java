@@ -88,7 +88,6 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
             TransactionRecord txrecord = new TransactionRecord(key1, version1, key2, version2, writekey, writeval, p2request.getPhase2Timestamp());
             boolean result = server_state.store.commit(txrecord);
 
-            // TODO:
             // for debug purposes
             System.out.println("Result is ready for request with reqid " + reqid);
 
