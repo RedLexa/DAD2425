@@ -55,10 +55,6 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 
     @Override
     public void committx(DadkvsMain.CommitRequest request, StreamObserver<DadkvsMain.CommitReply> responseObserver) {
-
-		// TODO: add if para ver se tem um phase 2 do mesmo seq number para dar match
-
-
 		// this is used to create the stubs only once whenever all the servers are up, its put here to avoid servers being down
 		if(!stubs_created){
 			this.stubs_created = true;
@@ -119,11 +115,9 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 		else{
 			server_state.request_list.put(request.getReqid(),request);
 		}
-
+		DadkvsPaxosServiceImpl.handle_all_possible_requests(request.getReqid(), this.server_state);
     }
-	//received seq number
-	//colocar o pedido de maneira ordenada num tree map, associado ao req id
-	// dependendo do tipo de pedido de recebeste, vais ver de que tipo é na array list
+
 
 
 
