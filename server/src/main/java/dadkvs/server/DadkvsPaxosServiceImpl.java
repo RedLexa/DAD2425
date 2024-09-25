@@ -44,9 +44,6 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
         System.out.println ("Receive phase two request: " + p2request);
         // get reqid from the phase 2 request sent by the leader
         int reqid = p2request.getPhase2Index();
-        if(server_state.request_list.containsKey(reqid)){
-            handle_all_possible_requests(reqid, this.server_state);
-        }
         this.server_state.phase2Observer.put(reqid,responseObserver);
         this.server_state.phase_two_requests.put(reqid,p2request);
 
@@ -59,6 +56,8 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
         // send phase two reply
         responseObserver.onNext(phase_two_reply);
         responseObserver.onCompleted();
+
+        handle_all_possible_requests(reqid, this.server_state);
     }
 
     @Override
@@ -68,8 +67,11 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     }
 
     public static void handle_all_possible_requests(int reqid, DadkvsServerState server_state){
+
+        System.out.println("handle_all_possible_requests");
+        System.out.println(server_state.next_req + "==" + reqid + "&&" + server_state.request_list.containsKey(reqid) + "&&" + server_state.phase_two_requests.containsKey(reqid));
         // enquanto o reqid for o do proximo pedido e se tivermos o pedido do cliente e do 2phase vamos processar a transacao
-        while(reqid == server_state.next_req && server_state.request_list.containsKey(reqid) && server_state.phase_two_requests.containsKey(reqid)) {
+        while(server_state.request_list.containsKey(reqid) && server_state.phase_two_requests.containsKey(reqid) && server_state.phase_two_requests.get(reqid).getPhase2Value() == server_state.next_req) {
 
             DadkvsMain.CommitRequest request = server_state.request_list.get(reqid);
             DadkvsPaxos.PhaseTwoRequest p2request = server_state.phase_two_requests.get(reqid);
@@ -98,6 +100,7 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
             // send commit reply to client
             server_state.responseObserver.get(reqid).onNext(response);
             server_state.responseObserver.get(reqid).onCompleted();
+            System.out.println("responded to client############");
             server_state.next_req += 1;
             reqid += 1;
         }

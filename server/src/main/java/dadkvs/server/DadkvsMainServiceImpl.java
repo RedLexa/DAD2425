@@ -92,11 +92,15 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 			GenericResponseCollector<DadkvsPaxos.PhaseTwoReply> phase_two_collector = new GenericResponseCollector<DadkvsPaxos.PhaseTwoReply> (phase_two_responses, n_servers);
 
 			for (int i = 0; i < n_servers; i++) {
+				if(server_state.my_id == i){
+					this.server_state.phase_two_requests.put(request.getReqid(), phase_two_request.build());
+					continue;
+				}
 				CollectorStreamObserver<DadkvsPaxos.PhaseTwoReply> phase_two_observer = new CollectorStreamObserver<DadkvsPaxos.PhaseTwoReply>(phase_two_collector);
 				async_stubs[i].phasetwo(phase_two_request.build(), phase_two_observer);
 			}
 
-			int responses_needed = n_servers;  // aqui disse que o lider espera receber mensagens de todos, no futuro sera da maioria acho eu
+			int responses_needed = n_servers-1;  // aqui disse que o lider espera receber mensagens de todos, no futuro sera da maioria acho eu
 			phase_two_collector.waitForTarget(responses_needed);
 			if (phase_two_responses.size() >= responses_needed) {
 				Iterator<DadkvsPaxos.PhaseTwoReply> phase_two_iterator = phase_two_responses.iterator();
@@ -105,6 +109,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 				boolean result = phase_two_reply.getPhase2Accepted();
 				if (result) {
 					System.out.println("phase_two index " + phase_two_request.getPhase2Index() + " with value " + phase_two_request.getPhase2Value());
+
 				} else {
 					System.out.println("phase_two Failed");
 				}
