@@ -17,6 +17,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 
+
 public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosServiceImplBase {
 
 
@@ -33,6 +34,29 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     public void phaseone(DadkvsPaxos.PhaseOneRequest request, StreamObserver<DadkvsPaxos.PhaseOneReply> responseObserver) {
 	// for debug purposes
 	System.out.println("Receive phase1 request: " + request);
+    if(!server_state.i_am_leader){
+        //verificar se timestamp recebido e maior doq aquele q ja tenho
+        boolean accepted = true;
+        int proposed = -1;
+        if(server_state.timestamp > request.getTimestamp()){
+            accepted = false;
+            //responder recusando
+        }else if(){        //verificar se ja tenho algum valor aceite previamente para este index (request.getIndex)
+            //colocar esse valor na resposta
+            //aceder a mapa de valores previamente aceites (old value)
+            proposed = old_value;
+        }
+        DadkvsPaxos.PhaseOneReply.Builder phase_one_reply = DadkvsPaxos.PhaseOneReply.newBuilder();
+				phase_one_reply.setPhase1Config(request.getConfig())
+						.setPhase1Index(request.getIndex())
+						.setPhase1Timestamp(server_state.timestamp)
+                        .setAccepted(accepted).
+                        setValue(proposed)
+                        .build();
+        responseObserver.onNext();
+        responseObserver.onCompleted();
+        //enviar resposta
+    }
 
     }
 
