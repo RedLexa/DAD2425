@@ -17,16 +17,14 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 
-import dadkvs.util.GenericResponseCollector;
-import dadkvs.util.CollectorStreamObserver;
 public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosServiceImplBase {
 
 
     DadkvsServerState server_state;
     
+    
     public DadkvsPaxosServiceImpl(DadkvsServerState state) {
 	this.server_state = state;
-        int config = 0;   // config is 0 for now, when we add it we can change it
 	
     }
     
@@ -39,72 +37,17 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     }
 
     @Override
-    public void phasetwo(DadkvsPaxos.PhaseTwoRequest p2request, StreamObserver<DadkvsPaxos.PhaseTwoReply> responseObserver) {
-        // for debug purposes
-        System.out.println ("Receive phase two request: " + p2request);
-        // get reqid from the phase 2 request sent by the leader
-        int reqid = p2request.getPhase2Index();
-        this.server_state.phase2Observer.put(reqid,responseObserver);
-        this.server_state.phase_two_requests.put(reqid,p2request);
+    public void phasetwo(DadkvsPaxos.PhaseTwoRequest request, StreamObserver<DadkvsPaxos.PhaseTwoReply> responseObserver) {
+	// for debug purposes
+	System.out.println ("Receive phase two request: " + request);
 
-        // build phase 2 reply message
-        DadkvsPaxos.PhaseTwoReply phase_two_reply = DadkvsPaxos.PhaseTwoReply.newBuilder()
-                .setPhase2Config(0)     // config is 0
-                .setPhase2Index(reqid)
-                .setPhase2Accepted(true).build();
-
-        // send phase two reply
-        responseObserver.onNext(phase_two_reply);
-        responseObserver.onCompleted();
-
-        handle_all_possible_requests(reqid, this.server_state);
     }
 
     @Override
     public void learn(DadkvsPaxos.LearnRequest request, StreamObserver<DadkvsPaxos.LearnReply> responseObserver) {
 	// for debug purposes
 	System.out.println("Receive learn request: " + request);
-    }
 
-    public static void handle_all_possible_requests(int reqid, DadkvsServerState server_state){
-
-        System.out.println("handle_all_possible_requests");
-        System.out.println(server_state.next_req + "==" + reqid + "&&" + server_state.request_list.containsKey(reqid) + "&&" + server_state.phase_two_requests.containsKey(reqid));
-        // enquanto o reqid for o do proximo pedido e se tivermos o pedido do cliente e do 2phase vamos processar a transacao
-        while(server_state.request_list.containsKey(reqid) && server_state.phase_two_requests.containsKey(reqid) && server_state.phase_two_requests.get(reqid).getPhase2Value() == server_state.next_req) {
-
-            DadkvsMain.CommitRequest request = server_state.request_list.get(reqid);
-            DadkvsPaxos.PhaseTwoRequest p2request = server_state.phase_two_requests.get(reqid);
-            int key1 = request.getKey1();
-            int version1 = request.getVersion1();
-            int key2 = request.getKey2();
-            int version2 = request.getVersion2();
-            int writekey = request.getWritekey();
-            int writeval = request.getWriteval();
-
-            // for debug purposes
-            System.out.println("reqid " + reqid + " key1 " + key1 + " v1 " + version1 + " k2 " + key2 + " v2 " + version2 + " wk " + writekey + " writeval " + writeval);
-
-            // append pedido a lista
-            // this.timestamp++;  so interessa para o ldier
-            TransactionRecord txrecord = new TransactionRecord(key1, version1, key2, version2, writekey, writeval, p2request.getPhase2Timestamp());
-            boolean result = server_state.store.commit(txrecord);
-
-            // for debug purposes
-            System.out.println("Result is ready for request with reqid " + reqid);
-
-
-            // create commit message to send to client
-            DadkvsMain.CommitReply response = DadkvsMain.CommitReply.newBuilder()
-                    .setReqid(reqid).setAck(result).build();
-            // send commit reply to client
-            server_state.responseObserver.get(reqid).onNext(response);
-            server_state.responseObserver.get(reqid).onCompleted();
-            System.out.println("responded to client############");
-            server_state.next_req += 1;
-            reqid += 1;
-        }
     }
 
 }
-
