@@ -83,7 +83,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 				async_stubs[i].phaseone(phase_one_request.build(), phase_one_observer);
 			}
 			int all_responses = n_servers - 1;
-			phase_one_collector.waitForTarget(all_responses);
+			phase_one_collector.waitForTarget(all_responses); //este wait deve estar errado, devemos ter de esperar em loop que so quebra quando temos maioria
 			int accepts_needed = (n_servers / 2) + 1;
 			int accepts_received = 0;
 			int highest_received_timestamp = -1;
@@ -118,31 +118,6 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 			} else
 				System.out.println("Panic...error phase_one ing");
 		}
-		int reqid = request.getReqid();
-		int key1 = request.getKey1();
-		int version1 = request.getVersion1();
-		int key2 = request.getKey2();
-		int version2 = request.getVersion2();
-		int writekey = request.getWritekey();
-		int writeval = request.getWriteval();
-
-		// for debug purposes
-		System.out.println("reqid " + reqid + " key1 " + key1 + " v1 " + version1 + " k2 " + key2 + " v2 " + version2
-				+ " wk " + writekey + " writeval " + writeval);
-
-		server_state.timestamp++;
-		TransactionRecord txrecord = new TransactionRecord(key1, version1, key2, version2, writekey, writeval,
-				server_state.timestamp);
-		boolean result = this.server_state.store.commit(txrecord);
-
-		// for debug purposes
-		System.out.println("Result is ready for request with reqid " + reqid);
-
-		DadkvsMain.CommitReply response = DadkvsMain.CommitReply.newBuilder()
-				.setReqid(reqid).setAck(result).build();
-
-		responseObserver.onNext(response);
-		responseObserver.onCompleted();
 	}
 
 	private void initComms() {
@@ -170,4 +145,43 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 	public int getAgreedIndexOrDefault(int index) {
 		return server_state.agreed_indexes.getOrDefault(index, -1);
 	}
+	// public static void executeCommit(int reqid, DadkvsServerState server_state){
+
+    //     System.out.println("handle_all_possible_requests");
+    //     System.out.println(server_state.next_req + "==" + reqid + "&&" + server_state.request_list.containsKey(reqid) + "&&" + server_state.phase_two_requests.containsKey(reqid));
+    //     // enquanto o reqid for o do proximo pedido e se tivermos o pedido do cliente e do 2phase vamos processar a transacao
+    //     while(server_state.request_list.containsKey(reqid) && server_state.phase_two_requests.containsKey(reqid) && server_state.phase_two_requests.get(reqid).getPhase2Value() == server_state.next_req) {
+
+    //         DadkvsMain.CommitRequest request = server_state.request_list.get(reqid);
+    //         DadkvsPaxos.PhaseTwoRequest p2request = server_state.phase_two_requests.get(reqid);
+    //         int key1 = request.getKey1();
+    //         int version1 = request.getVersion1();
+    //         int key2 = request.getKey2();
+    //         int version2 = request.getVersion2();
+    //         int writekey = request.getWritekey();
+    //         int writeval = request.getWriteval();
+
+    //         // for debug purposes
+    //         System.out.println("reqid " + reqid + " key1 " + key1 + " v1 " + version1 + " k2 " + key2 + " v2 " + version2 + " wk " + writekey + " writeval " + writeval);
+
+    //         // append pedido a lista
+    //         // this.timestamp++;  so interessa para o ldier
+    //         TransactionRecord txrecord = new TransactionRecord(key1, version1, key2, version2, writekey, writeval, p2request.getPhase2Timestamp());
+    //         boolean result = server_state.store.commit(txrecord);
+
+    //         // for debug purposes
+    //         System.out.println("Result is ready for request with reqid " + reqid);
+
+
+    //         // create commit message to send to client
+    //         DadkvsMain.CommitReply response = DadkvsMain.CommitReply.newBuilder()
+    //                 .setReqid(reqid).setAck(result).build();
+    //         // send commit reply to client
+    //         server_state.responseObserver.get(reqid).onNext(response);
+    //         server_state.responseObserver.get(reqid).onCompleted();
+    //         System.out.println("responded to client############");
+    //         server_state.next_req += 1;
+    //         reqid += 1;
+    //     }
+    // }
 }

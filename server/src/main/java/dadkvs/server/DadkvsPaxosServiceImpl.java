@@ -56,7 +56,7 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
                         .setAccepted(accepted)
                         .setValue(proposed)
                         .build();
-        responseObserver.onNext();
+        responseObserver.onNext(phase_one_reply);
         responseObserver.onCompleted();
         //enviar resposta
     }
