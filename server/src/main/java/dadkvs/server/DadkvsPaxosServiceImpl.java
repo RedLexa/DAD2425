@@ -37,6 +37,7 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
 	System.out.println("Receive phase1 request: " + request);
     if(!server_state.i_am_leader){
         //verificar se timestamp recebido e maior doq aquele q ja tenho
+        System.out.println("Received phase one request for index : " + request.getIndex() + " with timestamp: " + request.getPhase1Timestamp());
         boolean accepted = true;
         int proposed = -1;
         int accepted_value;

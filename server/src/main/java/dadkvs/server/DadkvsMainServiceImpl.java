@@ -95,13 +95,13 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 					}
 					// You can also handle the timestamps here
 					if (request.getValue() != -1 && request.getPhase1Accepted()) {
-						if (highest_received_timestamp < request.getTimestamp()) {
+						if (highest_received_timestamp < request.getPhase1Timestamp()) {
 							server_state.req_to_propose = request.getValue();
-							highest_received_timestamp = request.getTimestamp();
+							highest_received_timestamp = request.getPhase1Timestamp();
 						}
 
 					} else if (!request.getPhase1Accepted()) {
-						server_state.timestamp = request.getTimestamp();
+						server_state.timestamp = request.getPhase1Timestamp();
 						// acabas
 					}
 				}
