@@ -92,13 +92,18 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 			int accepts_received = 0;
 			int highest_received_timestamp = -1;
 			int messages_needed = accepts_needed;
-			while(accepts_received < accepts_needed){
+			while(accepts_received < accepts_needed || accepts_received < all_responses){
 				accepts_received = 0;    // podemos mudar a logica mas fiz so copy paste
 				phase_one_collector.waitForTarget(messages_needed);
 				for (DadkvsPaxos.PhaseOneReply phase_one_reply : phase_one_responses) {
 					if (phase_one_reply.getPhase1Accepted()) {
 						accepts_received++; // Count accepted responses
 					}
+					if (phase_one_reply.getPhase1Value() != -1) {
+						if (highest_received_timestamp < phase_one_reply.getPhase1Timestamp()) {
+							server_state.req_to_propose = phase_one_reply.getPhase1Value();
+							highest_received_timestamp = phase_one_reply.getPhase1Timestamp();
+						}
 				}
 				// se recebemos um quorum de mensagens e do quorum de mensagens ainda faltam
 				// (accepts needed - accepts recieved) accepts -> precisamos de esperar por mais
