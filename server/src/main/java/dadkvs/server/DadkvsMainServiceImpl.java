@@ -13,7 +13,6 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 
-
 public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServiceImplBase {
 
 	DadkvsServerState server_state;
@@ -52,6 +51,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 			this.stubs_created = true;
 			this.initComms();
 		}
+		int accepts_received = 0; // declaro isto aqui em cima por questoes de scope
 		// for debug purposes
 		System.out.println("Receiving commit request:" + request);
 
@@ -63,7 +63,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 			// comecar uma fase 1, olhando para o seu seq_number interno e verificando qual
 			// deve o proximo index a executar, propondo-o dessa forma
 
-			// server_state.req_to_propose = last_requestid_received; TO-DO: arranjar
+			server_state.req_to_propose = request.getReqid(); //aqui devia ser a ultima request q recebemos
 			// maneira de saber sempre qual a transacao que o lider acha que devia ser
 			// executada
 
@@ -87,13 +87,12 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 				async_stubs[i].phaseone(phase_one_request.build(), phase_one_observer);
 			}
 
-			int all_responses = n_servers - 1;     // TODO: mudar para while
-			int accepts_needed = (n_servers / 2);  // maioria considerando o nosso proprio pedido
-			int accepts_received = 0;
+			int all_responses = n_servers - 1; // TODO: mudar para while
+			int accepts_needed = (n_servers / 2); // maioria considerando o nosso proprio pedido
 			int highest_received_timestamp = -1;
 			int messages_needed = accepts_needed;
-			while(accepts_received < accepts_needed || accepts_received < all_responses){
-				accepts_received = 0;    // podemos mudar a logica mas fiz so copy paste
+			while (accepts_received <= accepts_needed) {
+				accepts_received = 0; // podemos mudar a logica mas fiz so copy paste
 				phase_one_collector.waitForTarget(messages_needed);
 				for (DadkvsPaxos.PhaseOneReply phase_one_reply : phase_one_responses) {
 					if (phase_one_reply.getPhase1Accepted()) {
@@ -104,19 +103,105 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 							server_state.req_to_propose = phase_one_reply.getPhase1Value();
 							highest_received_timestamp = phase_one_reply.getPhase1Timestamp();
 						}
+					}
+					// se recebemos um quorum de mensagens e do quorum de mensagens ainda faltam
+					// (accepts needed - accepts recieved) accepts -> precisamos de esperar por mais
+					// esse numero de mensagens
 				}
-				// se recebemos um quorum de mensagens e do quorum de mensagens ainda faltam
-				// (accepts needed - accepts recieved) accepts -> precisamos de esperar por mais
-				// esse numero de mensagens
 				messages_needed = messages_needed + accepts_needed - accepts_received;
+
 			}
+			if (accepts_received >= accepts_needed) {
+				System.out.println("Phase 1 Quorum reached with " + accepts_received + " acceptances.");
+				// avancar para fase 2 com o meu valor ou o valor q me foi dado pelos accepts
+				DadkvsPaxos.PhaseTwoRequest.Builder phase_two_request = DadkvsPaxos.PhaseTwoRequest.newBuilder();
+				phase_two_request.setPhase2Config(this.config)
+						.setPhase2Index(server_state.next_req)
+						.setPhase2Value(server_state.req_to_propose)
+						.setPhase2Timestamp(server_state.timestamp).build();
+				ArrayList<DadkvsPaxos.PhaseTwoReply> phase_two_responses = new ArrayList<DadkvsPaxos.PhaseTwoReply>();
+				GenericResponseCollector<DadkvsPaxos.PhaseTwoReply> phase_two_collector = new GenericResponseCollector<DadkvsPaxos.PhaseTwoReply>(
+						phase_two_responses, n_servers);
+				for (int i = 0; i < n_servers; i++) {
+					if (server_state.my_id == i) {
+						// this.server_state.phase_two_requests.put(request.getReqid(),
+						// phase_two_request.build());
+						continue;
+					}
+					CollectorStreamObserver<DadkvsPaxos.PhaseTwoReply> phase_two_observer = new CollectorStreamObserver<DadkvsPaxos.PhaseTwoReply>(
+							phase_two_collector);
+					async_stubs[i].phasetwo(phase_two_request.build(), phase_two_observer);
+				}
+				accepts_received = 0;
+				messages_needed = accepts_needed;
+				while (accepts_received < accepts_needed || accepts_received < all_responses) {
+					accepts_received = 0; // podemos mudar a logica mas fiz so copy paste
+					phase_two_collector.waitForTarget(messages_needed);
+					for (DadkvsPaxos.PhaseTwoReply phase_two_reply : phase_two_responses) {
+						if (phase_two_reply.getPhase2Accepted()) {
+							accepts_received++; // Count accepted responses
+						}
+					}
+					messages_needed = messages_needed + accepts_needed - accepts_received;
+					// se recebemos um quorum de mensagens e do quorum de mensagens ainda faltam
+					// (accepts needed - accepts recieved) accepts -> precisamos de esperar por mais
+					// esse numero de mensagens
+				}
+				if (accepts_received >= accepts_needed) {
+					// avancar para pedido de learn
+					System.out.println("Phase 2 Quorum reached with " + accepts_received + " acceptances.");
+					server_state.agreed_indexes.put(server_state.next_req, server_state.req_to_propose); // marcar como
+																											// guardado
+					DadkvsPaxos.LearnRequest.Builder learn_request = DadkvsPaxos.LearnRequest.newBuilder();
+					learn_request.setLearnconfig(this.config)
+							.setLearnindex(server_state.next_req)
+							.setLearnvalue(server_state.req_to_propose)
+							.setLearntimestamp(server_state.timestamp).build();
+					ArrayList<DadkvsPaxos.LearnReply> learn_responses = new ArrayList<DadkvsPaxos.LearnReply>();
+					GenericResponseCollector<DadkvsPaxos.LearnReply> learn_collector = new GenericResponseCollector<DadkvsPaxos.LearnReply>(
+							learn_responses, n_servers);
+					for (int i = 0; i < n_servers; i++) {
+						if (server_state.my_id == i) {
+							// this.server_state.phase_two_requests.put(request.getReqid(),
+							// phase_two_request.build());
+							continue;
+						}
+						CollectorStreamObserver<DadkvsPaxos.LearnReply> learn_observer = new CollectorStreamObserver<DadkvsPaxos.LearnReply>(
+								learn_collector);
+						async_stubs[i].learn(learn_request.build(), learn_observer);
+					}
+					accepts_received = 0;
+					messages_needed = accepts_needed;
+					while (accepts_received < accepts_needed || accepts_received < all_responses) {
+						accepts_received = 0; // podemos mudar a logica mas fiz so copy paste
+						learn_collector.waitForTarget(messages_needed);
+						for (DadkvsPaxos.LearnReply learn_reply : learn_responses) {
+							if (learn_reply.getLearnaccepted()) {
+								accepts_received++; // Count accepted responses
+							}
+						}
+						messages_needed = messages_needed + accepts_needed - accepts_received;
+						// se recebemos um quorum de mensagens e do quorum de mensagens ainda faltam
+						// (accepts needed - accepts recieved) accepts -> precisamos de esperar por mais
+						// esse numero de mensagens
+					}
+					if (accepts_received >= accepts_needed) {
+						System.out.println("Learn Quorum reached with " + accepts_received + " acceptances.");
+						executeCommit(server_state.req_to_propose, server_state);
 
-			System.out.println("Quorum reached with " + accepts_received + " acceptances.");
-			this.server_state.next_req++;
+					} else {
+						System.out.println("Failed to reach Learn quorum with " + accepts_received + " acceptances.");
+					}
+				} else {
+					System.out.println("Failed to reach Phase 2 quorum with " + accepts_received + " acceptances.");
+					return;
+				}
+			}else {
+				System.out.println("Failed to reach Phase 1 quorum with " + accepts_received + " acceptances.");
+				return;
+			}
+		} 
 
-		} /*else{
-			System.out.println("Panic...error phase_one ing");
-		}*/
 	}
 
 	private void initComms() {
@@ -141,43 +226,44 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 			async_stubs[i] = DadkvsPaxosServiceGrpc.newStub(channels[i]);
 		}
 	}
-	// public static void executeCommit(int reqid, DadkvsServerState server_state){
 
-    //     System.out.println("handle_all_possible_requests");
-    //     System.out.println(server_state.next_req + "==" + reqid + "&&" + server_state.request_list.containsKey(reqid) + "&&" + server_state.phase_two_requests.containsKey(reqid));
-    //     // enquanto o reqid for o do proximo pedido e se tivermos o pedido do cliente e do 2phase vamos processar a transacao
-    //     while(server_state.request_list.containsKey(reqid) && server_state.phase_two_requests.containsKey(reqid) && server_state.phase_two_requests.get(reqid).getPhase2Value() == server_state.next_req) {
+	public static void executeCommit(int reqid, DadkvsServerState server_state) {
 
-    //         DadkvsMain.CommitRequest request = server_state.request_list.get(reqid);
-    //         DadkvsPaxos.PhaseTwoRequest p2request = server_state.phase_two_requests.get(reqid);
-    //         int key1 = request.getKey1();
-    //         int version1 = request.getVersion1();
-    //         int key2 = request.getKey2();
-    //         int version2 = request.getVersion2();
-    //         int writekey = request.getWritekey();
-    //         int writeval = request.getWriteval();
+		System.out.println("handle_all_possible_requests");
+		System.out.println(server_state.next_req + "==" + reqid + "&&" +
+				server_state.request_list.containsKey(reqid));
+		// enquanto o reqid for o do proximo pedido e se tivermos o pedido do cliente
+		// e do 2phase vamos processar a transacao
 
-    //         // for debug purposes
-    //         System.out.println("reqid " + reqid + " key1 " + key1 + " v1 " + version1 + " k2 " + key2 + " v2 " + version2 + " wk " + writekey + " writeval " + writeval);
+		DadkvsMain.CommitRequest request = server_state.request_list.get(reqid);
+		int key1 = request.getKey1();
+		int version1 = request.getVersion1();
+		int key2 = request.getKey2();
+		int version2 = request.getVersion2();
+		int writekey = request.getWritekey();
+		int writeval = request.getWriteval();
 
-    //         // append pedido a lista
-    //         // this.timestamp++;  so interessa para o ldier
-    //         TransactionRecord txrecord = new TransactionRecord(key1, version1, key2, version2, writekey, writeval, p2request.getPhase2Timestamp());
-    //         boolean result = server_state.store.commit(txrecord);
+		// for debug purposes
+		System.out.println("reqid " + reqid + " key1 " + key1 + " v1 " + version1 + "k2"
+				+ key2 + " v2 " + version2 + " wk " + writekey + " writeval " +
+				writeval);
 
-    //         // for debug purposes
-    //         System.out.println("Result is ready for request with reqid " + reqid);
+		// append pedido a lista
+		// this.timestamp++; so interessa para o ldier
+		TransactionRecord txrecord = new TransactionRecord(key1, version1, key2,
+				version2, writekey, writeval, server_state.timestamp);
+		boolean result = server_state.store.commit(txrecord);
 
+		// for debug purposes
+		System.out.println("Result is ready for request with reqid " + reqid);
 
-    //         // create commit message to send to client
-    //         DadkvsMain.CommitReply response = DadkvsMain.CommitReply.newBuilder()
-    //                 .setReqid(reqid).setAck(result).build();
-    //         // send commit reply to client
-    //         server_state.responseObserver.get(reqid).onNext(response);
-    //         server_state.responseObserver.get(reqid).onCompleted();
-    //         System.out.println("responded to client############");
-    //         server_state.next_req += 1;
-    //         reqid += 1;
-    //     }
-    // }
+		// create commit message to send to client
+		DadkvsMain.CommitReply response = DadkvsMain.CommitReply.newBuilder()
+				.setReqid(reqid).setAck(result).build();
+		// send commit reply to client
+		server_state.responseObserver.get(reqid).onNext(response);
+		server_state.responseObserver.get(reqid).onCompleted();
+		System.out.println("responded to client############");
+	}
+
 }
