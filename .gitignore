@@ -6,3 +6,4 @@
 *.properties
 *.jar
 pom.xml
+contract/target

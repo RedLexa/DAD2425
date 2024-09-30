@@ -1,4 +1,3 @@
-
 package dadkvs.server;
 
 
@@ -9,7 +8,6 @@ import java.util.Iterator;
 import dadkvs.DadkvsMain;
 import dadkvs.DadkvsPaxos;
 import dadkvs.DadkvsPaxosServiceGrpc;
-import dadkvs.DadkvsConsoleServiceImpl;
 
 import dadkvs.util.GenericResponseCollector;
 import dadkvs.util.CollectorStreamObserver;
@@ -18,6 +16,8 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 
+import dadkvs.util.GenericResponseCollector;
+import dadkvs.util.CollectorStreamObserver;
 
 public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosServiceImplBase {
 
@@ -37,21 +37,21 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
 	System.out.println("Receive phase1 request: " + request);
     if(!server_state.i_am_leader){
         //verificar se timestamp recebido e maior doq aquele q ja tenho
-        System.out.println("Received phase one request for index : " + request.getIndex() + " with timestamp: " + request.getPhase1Timestamp());
+        System.out.println("Received phase one request for index : " + request.getPhase1Index() + " with timestamp: " + request.getPhase1Timestamp());
         boolean accepted = true;
-        int accepted_value = getAgreedIndexOrDefault(request.getIndex());
-        if(server_state.timestamp > request.getTimestamp()){
+        int accepted_value = server_state.agreed_indexes.getOrDefault(request.getPhase1Index(), -1);
+        if(server_state.timestamp > request.getPhase1Timestamp()){
             accepted = false;
             //responder recusando
         }
         DadkvsPaxos.PhaseOneReply.Builder phase_one_reply = DadkvsPaxos.PhaseOneReply.newBuilder();
-				phase_one_reply.setPhase1Config(request.getConfig())
-						.setPhase1Index(request.getIndex())
+				phase_one_reply.setPhase1Config(request.getPhase1Config())
+						.setPhase1Index(request.getPhase1Index())
 						.setPhase1Timestamp(server_state.timestamp)
-                        .setAccepted(accepted)
-                        .setValue(accepted_value)
+                        .setPhase1Accepted(accepted)
+                        .setPhase1Value(accepted_value)
                         .build();
-        responseObserver.onNext(phase_one_reply);
+        responseObserver.onNext(phase_one_reply.build());
         responseObserver.onCompleted();
         //enviar resposta
     }
