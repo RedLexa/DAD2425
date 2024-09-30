@@ -53,8 +53,8 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
 				phase_one_reply.setPhase1Config(request.getConfig())
 						.setPhase1Index(request.getIndex())
 						.setPhase1Timestamp(server_state.timestamp)
-                        .setAccepted(accepted).
-                        setValue(proposed)
+                        .setAccepted(accepted)
+                        .setValue(proposed)
                         .build();
         responseObserver.onNext();
         responseObserver.onCompleted();
