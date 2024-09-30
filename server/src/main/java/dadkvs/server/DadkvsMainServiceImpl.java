@@ -86,42 +86,32 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 						phase_one_collector);
 				async_stubs[i].phaseone(phase_one_request.build(), phase_one_observer);
 			}
-			int all_responses = n_servers - 1;
-			phase_one_collector.waitForTarget(all_responses); //este wait deve estar errado, devemos ter de esperar em loop que so quebra quando temos maioria
-			int accepts_needed = (n_servers / 2) + 1;
+
+			int all_responses = n_servers - 1;     // TODO: mudar para while
+			int accepts_needed = (n_servers / 2);  // maioria considerando o nosso proprio pedido
 			int accepts_received = 0;
 			int highest_received_timestamp = -1;
-			if (phase_one_responses.size() >= accepts_needed) {
-				// Iterate through all responses to count accepted ones
+			int messages_needed = accepts_needed;
+			while(accepts_received < accepts_needed){
+				accepts_received = 0;    // podemos mudar a logica mas fiz so copy paste
+				phase_one_collector.waitForTarget(messages_needed);
 				for (DadkvsPaxos.PhaseOneReply phase_one_reply : phase_one_responses) {
 					if (phase_one_reply.getPhase1Accepted()) {
 						accepts_received++; // Count accepted responses
 					}
-					// You can also handle the timestamps here
-					if (phase_one_reply.getPhase1Value() != -1 && phase_one_reply.getPhase1Accepted()) {
-						if (highest_received_timestamp < phase_one_reply.getPhase1Timestamp()) {
-							server_state.req_to_propose = phase_one_reply.getPhase1Value();
-							highest_received_timestamp = phase_one_reply.getPhase1Timestamp();
-						}
-
-					} else if (!phase_one_reply.getPhase1Accepted()) {
-						server_state.timestamp = phase_one_reply.getPhase1Timestamp();
-						// acabas
-					}
 				}
+				// se recebemos um quorum de mensagens e do quorum de mensagens ainda faltam
+				// (accepts needed - accepts recieved) accepts -> precisamos de esperar por mais
+				// esse numero de mensagens
+				messages_needed = messages_needed + accepts_needed - accepts_received;
+			}
 
-				// After the loop, check if quorum is met
-				if (accepts_received >= accepts_needed) {
-					// Quorum reached: proceed to Phase Two with the most accepted value
-					System.out.println("Quorum reached with " + accepts_received + " acceptances.");
-					// Handle Phase Two proposal logic here
-				} else {
-					System.out.println("Not enough acceptances received. Total: " + accepts_received);
-					// tentar outra vez? como?
-				}
-			} else
-				System.out.println("Panic...error phase_one ing");
-		}
+			System.out.println("Quorum reached with " + accepts_received + " acceptances.");
+			this.server_state.next_req++;
+
+		} /*else{
+			System.out.println("Panic...error phase_one ing");
+		}*/
 	}
 
 	private void initComms() {
