@@ -21,6 +21,7 @@ public class DadkvsServerState {
     int next_req = 1;
     int               timestamp;
      Map<Integer, DadkvsMain.CommitRequest> request_list;
+     Map<Integer, Integer> agreed_indexes; 
     Map<Integer, StreamObserver<DadkvsMain.CommitReply>> responseObserver;
 
     
@@ -36,6 +37,7 @@ public class DadkvsServerState {
 	main_loop_worker.start();
     request_list = new HashMap<Integer,DadkvsMain.CommitRequest>();
     responseObserver = new HashMap<Integer,StreamObserver<DadkvsMain.CommitReply>>();
+    agreed_indexes = new HashMap<Integer,Integer>();
     req_to_propose = -1;
     timestamp = 0;
     }

@@ -9,6 +9,7 @@ import java.util.Iterator;
 import dadkvs.DadkvsMain;
 import dadkvs.DadkvsPaxos;
 import dadkvs.DadkvsPaxosServiceGrpc;
+import dadkvs.DadkvsConsoleServiceImpl;
 
 import dadkvs.util.GenericResponseCollector;
 import dadkvs.util.CollectorStreamObserver;
@@ -38,13 +39,15 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
         //verificar se timestamp recebido e maior doq aquele q ja tenho
         boolean accepted = true;
         int proposed = -1;
+        int accepted_value;
         if(server_state.timestamp > request.getTimestamp()){
             accepted = false;
+            accepted_value = getAgreedIndexOrDefault(request.getIndex());
             //responder recusando
-        }else if(){        //verificar se ja tenho algum valor aceite previamente para este index (request.getIndex)
+        }else if(accepted_value != -1){        //verificar se ja tenho algum valor aceite previamente para este index (request.getIndex)
             //colocar esse valor na resposta
             //aceder a mapa de valores previamente aceites (old value)
-            proposed = old_value;
+            proposed = accepted_value;
         }
         DadkvsPaxos.PhaseOneReply.Builder phase_one_reply = DadkvsPaxos.PhaseOneReply.newBuilder();
 				phase_one_reply.setPhase1Config(request.getConfig())
