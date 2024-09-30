@@ -39,23 +39,17 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
         //verificar se timestamp recebido e maior doq aquele q ja tenho
         System.out.println("Received phase one request for index : " + request.getIndex() + " with timestamp: " + request.getPhase1Timestamp());
         boolean accepted = true;
-        int proposed = -1;
-        int accepted_value;
+        int accepted_value = getAgreedIndexOrDefault(request.getIndex());
         if(server_state.timestamp > request.getTimestamp()){
             accepted = false;
-            accepted_value = getAgreedIndexOrDefault(request.getIndex());
             //responder recusando
-        }else if(accepted_value != -1){        //verificar se ja tenho algum valor aceite previamente para este index (request.getIndex)
-            //colocar esse valor na resposta
-            //aceder a mapa de valores previamente aceites (old value)
-            proposed = accepted_value;
         }
         DadkvsPaxos.PhaseOneReply.Builder phase_one_reply = DadkvsPaxos.PhaseOneReply.newBuilder();
 				phase_one_reply.setPhase1Config(request.getConfig())
 						.setPhase1Index(request.getIndex())
 						.setPhase1Timestamp(server_state.timestamp)
                         .setAccepted(accepted)
-                        .setValue(proposed)
+                        .setValue(accepted_value)
                         .build();
         responseObserver.onNext(phase_one_reply);
         responseObserver.onCompleted();
