@@ -58,7 +58,8 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 		server_state.responseObserver.put(request.getReqid(), responseObserver);
 		server_state.request_list.put(request.getReqid(), request);
 
-		if (server_state.i_am_leader && !server_state.request_list.containsKey(request.getReqid())) {
+		if (server_state.i_am_leader && server_state.request_list.containsKey(request.getReqid())) {
+			System.out.println("SOU O LIDER #################");
 			// comecar uma fase 1, olhando para o seu seq_number interno e verificando qual
 			// deve o proximo index a executar, propondo-o dessa forma
 
