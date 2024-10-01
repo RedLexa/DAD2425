@@ -91,7 +91,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 			int accepts_needed = (n_servers / 2); // maioria considerando o nosso proprio pedido
 			int highest_received_timestamp = -1;
 			int messages_needed = accepts_needed;
-			while (accepts_received <= accepts_needed) {
+			while (accepts_received < accepts_needed) {
 				accepts_received = 0; // podemos mudar a logica mas fiz so copy paste
 				phase_one_collector.waitForTarget(messages_needed);
 				for (DadkvsPaxos.PhaseOneReply phase_one_reply : phase_one_responses) {
@@ -134,7 +134,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 				}
 				accepts_received = 0;
 				messages_needed = accepts_needed;
-				while (accepts_received < accepts_needed || accepts_received < all_responses) {
+				while (accepts_received < accepts_needed) {
 					accepts_received = 0; // podemos mudar a logica mas fiz so copy paste
 					phase_two_collector.waitForTarget(messages_needed);
 					for (DadkvsPaxos.PhaseTwoReply phase_two_reply : phase_two_responses) {
@@ -147,7 +147,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 					// (accepts needed - accepts recieved) accepts -> precisamos de esperar por mais
 					// esse numero de mensagens
 				}
-				if (accepts_received >= accepts_needed) {
+				if (true || accepts_received >= accepts_needed) {
 					// avancar para pedido de learn
 					System.out.println("Phase 2 Quorum reached with " + accepts_received + " acceptances.");
 					server_state.agreed_indexes.put(server_state.next_req, server_state.req_to_propose); // marcar como
@@ -172,7 +172,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 					}
 					accepts_received = 0;
 					messages_needed = accepts_needed;
-					while (accepts_received < accepts_needed || accepts_received < all_responses) {
+					while (accepts_received < accepts_needed) {
 						accepts_received = 0; // podemos mudar a logica mas fiz so copy paste
 						learn_collector.waitForTarget(messages_needed);
 						for (DadkvsPaxos.LearnReply learn_reply : learn_responses) {
@@ -185,7 +185,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 						// (accepts needed - accepts recieved) accepts -> precisamos de esperar por mais
 						// esse numero de mensagens
 					}
-					if (accepts_received >= accepts_needed) {
+					if (true || accepts_received >= accepts_needed) {
 						System.out.println("Learn Quorum reached with " + accepts_received + " acceptances.");
 						executeCommit(server_state.req_to_propose, server_state);
 

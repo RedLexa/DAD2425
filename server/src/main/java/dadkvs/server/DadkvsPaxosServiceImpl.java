@@ -58,6 +58,13 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
         responseObserver.onCompleted();
         //enviar resposta
     }
+    else{
+        ;
+        // wait for x messages
+
+        // send phasse 2 messages
+
+    }
 
     }
 
