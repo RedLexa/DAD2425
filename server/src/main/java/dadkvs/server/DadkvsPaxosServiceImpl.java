@@ -74,7 +74,7 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
         System.out.println ("Receive phase two request: " + request);
         boolean accepted = true;
         if(!server_state.i_am_leader){
-            System.out.println("Received phase one request for index : " + request.getPhase2Index() + " with timestamp: " + request.getPhase2Timestamp());
+            System.out.println("Received phase two request for index : " + request.getPhase2Index() + " with timestamp: " + request.getPhase2Timestamp());
             if(server_state.timestamp > request.getPhase2Timestamp()){
                 accepted = false;
             }else{
@@ -94,7 +94,23 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     public void learn(DadkvsPaxos.LearnRequest request, StreamObserver<DadkvsPaxos.LearnReply> responseObserver) {
 	// for debug purposes
 	System.out.println("Receive learn request: " + request);
+    boolean accepted = true;
+    if(request.getLearntimestamp() < server_state.timestamp){
+        accepted = false;
+    }
+    DadkvsPaxos.LearnReply.Builder learn_reply = DadkvsPaxos.LearnReply.newBuilder();
+    learn_reply.setLearnconfig(request.getLearnconfig())
+            .setLearnindex(request.getLearnindex())
+            .setLearnaccepted(accepted)
+            .build();
+responseObserver.onNext(learn_reply.build());
+responseObserver.onCompleted();
+    DadkvsMainServiceImpl.executeCommit(request.getLearnvalue(), server_state);
+    responseObserver.onNext(learn_reply.build());
+    responseObserver.onCompleted();
 
     }
+
+    
 
 }
