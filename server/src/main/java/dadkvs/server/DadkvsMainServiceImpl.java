@@ -70,7 +70,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 			server_state.timestamp++;
 			DadkvsPaxos.PhaseOneRequest.Builder phase_one_request = DadkvsPaxos.PhaseOneRequest.newBuilder();
 			phase_one_request.setPhase1Config(this.config)
-					.setPhase1Index(server_state.next_req)
+					.setPhase1Index(server_state.next_req) // seq num
 					.setPhase1Timestamp(server_state.timestamp).build();
 			// talvez esta logica daqui para baixo deva estar na parte do paxos?
 			ArrayList<DadkvsPaxos.PhaseOneReply> phase_one_responses = new ArrayList<DadkvsPaxos.PhaseOneReply>();

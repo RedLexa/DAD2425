@@ -63,25 +63,24 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
 
     @Override
     public void phasetwo(DadkvsPaxos.PhaseTwoRequest request, StreamObserver<DadkvsPaxos.PhaseTwoReply> responseObserver) {
-	// for debug purposes
-	System.out.println ("Receive phase two request: " + request);
-    boolean accepted = true;
-    if(!server_state.i_am_leader){
-        System.out.println("Received phase one request for index : " + request.getPhase2Index() + " with timestamp: " + request.getPhase2Timestamp());
-        if(server_state.timestamp > request.getPhase2Timestamp()){
-            accepted = false;
-        }else{
-            server_state.agreed_indexes.put(request.getPhase2Index(),request.getPhase2Value()); //marcar como guardado
+        // for debug purposes
+        System.out.println ("Receive phase two request: " + request);
+        boolean accepted = true;
+        if(!server_state.i_am_leader){
+            System.out.println("Received phase one request for index : " + request.getPhase2Index() + " with timestamp: " + request.getPhase2Timestamp());
+            if(server_state.timestamp > request.getPhase2Timestamp()){
+                accepted = false;
+            }else{
+                server_state.agreed_indexes.put(request.getPhase2Index(),request.getPhase2Value()); //marcar como guardado
+            }
+            DadkvsPaxos.PhaseTwoReply.Builder phase_two_reply = DadkvsPaxos.PhaseTwoReply.newBuilder();
+            phase_two_reply.setPhase2Config(request.getPhase2Config())
+                    .setPhase2Index(request.getPhase2Index())
+                    .setPhase2Accepted(accepted)
+                    .build();
+        responseObserver.onNext(phase_two_reply.build());
+        responseObserver.onCompleted();
         }
-        DadkvsPaxos.PhaseTwoReply.Builder phase_two_reply = DadkvsPaxos.PhaseTwoReply.newBuilder();
-        phase_two_reply.setPhase2Config(request.getPhase2Config())
-                .setPhase2Index(request.getPhase2Index())
-                .setPhase2Accepted(accepted)
-                .build();
-    responseObserver.onNext(phase_two_reply.build());
-    responseObserver.onCompleted();
-    }
-
     }
 
     @Override
