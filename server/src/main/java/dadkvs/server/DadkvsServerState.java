@@ -20,9 +20,11 @@ public class DadkvsServerState {
     int req_to_propose;
     int next_req = 1;
     int               timestamp;
-     Map<Integer, DadkvsMain.CommitRequest> request_list;
-     Map<Integer, Integer> agreed_indexes; 
+    Map<Integer, DadkvsMain.CommitRequest> request_list;
+    Map<Integer, Integer> agreed_indexes; 
     Map<Integer, StreamObserver<DadkvsMain.CommitReply>> responseObserver;
+    Map<Integer, DadkvsPaxos.LearnRequest> ordered_learn_requests;
+    boolean locked = false;
 
     
     public DadkvsServerState(int kv_size, int port, int myself) {
@@ -38,6 +40,7 @@ public class DadkvsServerState {
     request_list = new HashMap<Integer,DadkvsMain.CommitRequest>();
     responseObserver = new HashMap<Integer,StreamObserver<DadkvsMain.CommitReply>>();
     agreed_indexes = new HashMap<Integer,Integer>();
+    ordered_learn_requests = new HashMap<Integer,DadkvsPaxos.LearnRequest>();
     req_to_propose = -1;
     timestamp = 0;
     }

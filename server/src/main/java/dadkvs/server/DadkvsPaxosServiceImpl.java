@@ -34,7 +34,7 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     @Override
     public void phaseone(DadkvsPaxos.PhaseOneRequest request, StreamObserver<DadkvsPaxos.PhaseOneReply> responseObserver) {
 	// for debug purposes
-	System.out.println("Receive phase1 request: " + request);
+	System.out.println("Receive phase1 request: " + request.getPhase1Index());
     if(!server_state.i_am_leader){
         //verificar se timestamp recebido e maior doq aquele q ja tenho
         System.out.println("Received phase one request for index : " + request.getPhase1Index() + " with timestamp: " + request.getPhase1Timestamp());
@@ -98,14 +98,17 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     if(request.getLearntimestamp() < server_state.timestamp){
         accepted = false;
     }
+    server_state.ordered_learn_requests.put(request.getLearnindex(), request);
+
     DadkvsPaxos.LearnReply.Builder learn_reply = DadkvsPaxos.LearnReply.newBuilder();
     learn_reply.setLearnconfig(request.getLearnconfig())
             .setLearnindex(request.getLearnindex())
             .setLearnaccepted(accepted)
             .build();
-responseObserver.onNext(learn_reply.build());
-responseObserver.onCompleted();
-    DadkvsMainServiceImpl.executeCommit(request.getLearnvalue(), server_state);
+
+    //responseObserver.onNext(learn_reply.build());
+    //responseObserver.onCompleted();
+    DadkvsMainServiceImpl.executeCommits(server_state);
     responseObserver.onNext(learn_reply.build());
     responseObserver.onCompleted();
 
