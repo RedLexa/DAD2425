@@ -13,6 +13,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 
+
 public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServiceImplBase {
 
 	DadkvsServerState server_state;
@@ -131,13 +132,16 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 
 				phase_one_collector.waitForTarget(accepts_needed);
 
+
+				boolean continuer = false;
 				for (DadkvsPaxos.PhaseOneReply phase_one_reply : phase_one_responses) {
 					if (phase_one_reply.getPhase1Accepted()) {
 						accepts_received++; // Count accepted responses
 					} else {
 						if (this.server_state.timestamp <= phase_one_reply.getPhase1Timestamp()) {
 							this.server_state.timestamp = phase_one_reply.getPhase1Timestamp() + 1;
-							continue;
+							continuer = true;
+							break;
 						}
 					}
 					if (phase_one_reply.getPhase1Value() != -1) {
@@ -146,6 +150,9 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 							highest_received_timestamp = phase_one_reply.getPhase1Timestamp();
 						}
 					}
+				}
+				if (continuer) {
+					continue;
 				}
 
 				System.out.println("Phase 1 Quorum reached with " + accepts_received + " acceptances.");
@@ -170,14 +177,18 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 				messages_needed = accepts_needed;
 
 				phase_two_collector.waitForTarget(messages_needed);
-
+				continuer = false;
 				for (DadkvsPaxos.PhaseTwoReply phase_two_reply : phase_two_responses) {
 					if (phase_two_reply.getPhase2Accepted()) {
 						accepts_received++; // Count accepted responses
 					} else {
-						continue;
+						continuer = true;
+						break;
 					}
 				}
+				if (continuer) 
+					continue;
+					
 			}
 			// Learning Phase
 			System.out.println("Phase 2 Quorum reached with " + accepts_received + " acceptances.");
@@ -267,7 +278,6 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 				writeval);
 
 		// append pedido a lista
-		// this.timestamp++; so interessa para o ldier
 		TransactionRecord txrecord = new TransactionRecord(key1, version1, key2,
 				version2, writekey, writeval, server_state.timestamp);
 		boolean result = server_state.store.commit(txrecord);
@@ -283,6 +293,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 		server_state.responseObserver.get(reqid).onCompleted();
 		System.out.println("responded to client############");
 	}
+
 	public static void send_learn_requests(DadkvsPaxos.PhaseTwoRequest request) {
 		int n_servers = 5;
 		DadkvsPaxos.LearnRequest.Builder learn_request = DadkvsPaxos.LearnRequest.newBuilder();

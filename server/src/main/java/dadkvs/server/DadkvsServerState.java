@@ -44,7 +44,7 @@ public class DadkvsServerState {
     agreed_indexes = new HashMap<Integer,DadkvsPaxos.PhaseTwoRequest>();
     ordered_learn_requests = new HashMap<Integer,DadkvsPaxos.LearnRequest>();
     req_to_propose = -1;
-    timestamp = 0;
+    timestamp = myself;
     learn_counter = new HashMap<Integer, Integer>();
     }
 }
