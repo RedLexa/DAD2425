@@ -33,39 +33,35 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
 
     @Override
     public void phaseone(DadkvsPaxos.PhaseOneRequest request, StreamObserver<DadkvsPaxos.PhaseOneReply> responseObserver) {
+    boolean accepted = true;
 	// for debug purposes
 	System.out.println("Receive phase1 request: " + request.getPhase1Index());
-    if(!server_state.i_am_leader){
-        //verificar se timestamp recebido e maior doq aquele q ja tenho
-        System.out.println("Received phase one request for index : " + request.getPhase1Index() + " with timestamp: " + request.getPhase1Timestamp());
-        boolean accepted = true;
-        int accepted_value = server_state.agreed_indexes.getOrDefault(request.getPhase1Index(), -1);
-        if(server_state.timestamp > request.getPhase1Timestamp()){
-            accepted = false;
-            //responder recusando
-            System.out.println("Will refuse the request");
-        }else{
-            server_state.timestamp = request.getPhase1Timestamp();
-        }
-        DadkvsPaxos.PhaseOneReply.Builder phase_one_reply = DadkvsPaxos.PhaseOneReply.newBuilder();
-				phase_one_reply.setPhase1Config(request.getPhase1Config())
-						.setPhase1Index(request.getPhase1Index())
-						.setPhase1Timestamp(server_state.timestamp)
-                        .setPhase1Accepted(accepted)
-                        .setPhase1Value(accepted_value)
-                        .build();
-        responseObserver.onNext(phase_one_reply.build());
-        responseObserver.onCompleted();
-        //enviar resposta
+    if(server_state.highest_leader > request.getPhase1Timestamp()){
+        accepted = false;
+        if()
     }
-    else{
-        ;
-        // wait for x messages
-
-        // send phasse 2 messages
-
+    server_state.highest_leader = Math.max(server_state.highest_leader,request.getPhase1Config());
+    
+    System.out.println("Received phase one request for index : " + request.getPhase1Index() + " with timestamp: " + request.getPhase1Timestamp());
+    // TODO SOMETHING
+    int accepted_value = server_state.agreed_indexes.getOrDefault(request.getPhase1Index(), -1);
+    //if(server_state.timestamp > request.getPhase1Timestamp()){
+    if(server_state.agreed_indexes.getOrDefault(request.getPhase2Index(),-1) > request.getPhase1Timestamp()){ 
+        accepted = false;
+        //responder recusando
+        System.out.println("Will refuse the request");
+    }else{
+        server_state.timestamp = request.getPhase1Timestamp();
     }
-
+    DadkvsPaxos.PhaseOneReply.Builder phase_one_reply = DadkvsPaxos.PhaseOneReply.newBuilder();
+			phase_one_reply.setPhase1Config(request.getPhase1Config())
+					.setPhase1Index(request.getPhase1Index())
+					.setPhase1Timestamp(server_state.timestamp)
+                    .setPhase1Accepted(accepted)
+                    .setPhase1Value(accepted_value)
+                    .build();
+    responseObserver.onNext(phase_one_reply.build());
+    responseObserver.onCompleted();
     }
 
     @Override
@@ -77,6 +73,8 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
         if(server_state.timestamp > request.getPhase2Timestamp()){
             accepted = false;
         }else{
+            // TODO: check timestamp
+            // TODO: change to request
             server_state.agreed_indexes.put(request.getPhase2Index(),request.getPhase2Value()); //marcar como guardado
         }
         DadkvsPaxos.PhaseTwoReply.Builder phase_two_reply = DadkvsPaxos.PhaseTwoReply.newBuilder();

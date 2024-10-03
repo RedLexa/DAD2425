@@ -54,6 +54,9 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 	public void committx(DadkvsMain.CommitRequest request, StreamObserver<DadkvsMain.CommitReply> responseObserver) {
 		// Make sure no other thread running
 		// Necessary for this phase of implementation
+
+		//notify this.server_state.dowork
+		
 		if(this.server_state.i_am_leader){
 			// only one commit at a time for the leader
 			synchronized(this){

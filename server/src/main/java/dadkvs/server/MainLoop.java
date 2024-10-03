@@ -44,6 +44,7 @@ public class MainLoop implements Runnable  {
 	    catch (InterruptedException e) {
 	    }
 	}
+	// do consensus
 	System.out.println("Main loop do work finish");
     }
     

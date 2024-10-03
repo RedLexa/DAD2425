@@ -24,6 +24,7 @@ public class DadkvsServerState {
     Map<Integer, Integer> agreed_indexes; 
     Map<Integer, StreamObserver<DadkvsMain.CommitReply>> responseObserver;
     Map<Integer, DadkvsPaxos.LearnRequest> ordered_learn_requests;
+    int highest_leader= -1;
     boolean locked = false;
 
     
