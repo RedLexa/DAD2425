@@ -111,6 +111,13 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     if(server_state.learn_counter.get(request.getLearntimestamp()) >= 3){
         System.out.println("Received quorum if learning requests---------------------------------------------");
         DadkvsMainServiceImpl.executeCommits(server_state);
+        if(server_state.i_am_leader){
+            synchronized (this) {
+                this.server_state.next_req++;
+                this.server_state.locked = false; // destranca o consensus e notifica os outros threads
+                notifyAll();
+            }
+        }
     }
     DadkvsPaxos.LearnReply.Builder learn_reply = DadkvsPaxos.LearnReply.newBuilder();
     learn_reply.setLearnconfig(request.getLearnconfig())
@@ -120,14 +127,8 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     //DadkvsMainServiceImpl.executeCommits(server_state);
     responseObserver.onNext(learn_reply.build());
     responseObserver.onCompleted();
-    
-    if(server_state.i_am_leader){
-        synchronized (this) {
-            this.server_state.next_req++;
-            this.server_state.locked = false; // destranca o consensus e notifica os outros threads
-            notifyAll();
-        }
-    }
+
+  
 
     }
 
