@@ -111,9 +111,9 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     if(server_state.learn_counter.get(request.getLearntimestamp()) >= 3){
         System.out.println("Received quorum if learning requests---------------------------------------------");
         DadkvsMainServiceImpl.executeCommits(server_state);
+        this.server_state.next_req++;
         if(server_state.i_am_leader){
             synchronized (this) {
-                this.server_state.next_req++;
                 this.server_state.locked = false; // destranca o consensus e notifica os outros threads
                 notifyAll();
             }
