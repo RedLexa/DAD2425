@@ -25,7 +25,7 @@ gnome-terminal --working-directory="$SCRIPT_DIR/server" -- bash -c "mvn exec:jav
 ########################################################################################################################
 
 # Open terminal for console
-gnome-terminal --working-directory="$SCRIPT_DIR/consoleclient" -- bash -c "mvn exec:java && leader on 0;"
+#gnome-terminal --working-directory="$SCRIPT_DIR/consoleclient" -- bash -c "mvn exec:java && leader on 0;"
 gnome-terminal --working-directory="$SCRIPT_DIR/consoleclient" -- bash -c "./run_console_with_command.exp"
 
 ########################################################################################################################

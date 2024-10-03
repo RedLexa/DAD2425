@@ -38,25 +38,20 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
 	System.out.println("Receive phase1 request: " + request.getPhase1Index());
     if(server_state.highest_leader > request.getPhase1Timestamp()){
         accepted = false;
-        if()
-    }
-    server_state.highest_leader = Math.max(server_state.highest_leader,request.getPhase1Config());
-    
+    }else {
+        server_state.highest_leader = request.getPhase1Timestamp();
+    }    
     System.out.println("Received phase one request for index : " + request.getPhase1Index() + " with timestamp: " + request.getPhase1Timestamp());
-    // TODO SOMETHING
-    int accepted_value = server_state.agreed_indexes.getOrDefault(request.getPhase1Index(), -1);
-    //if(server_state.timestamp > request.getPhase1Timestamp()){
-    if(server_state.agreed_indexes.getOrDefault(request.getPhase2Index(),-1) > request.getPhase1Timestamp()){ 
-        accepted = false;
-        //responder recusando
-        System.out.println("Will refuse the request");
-    }else{
-        server_state.timestamp = request.getPhase1Timestamp();
+    // TODO 
+    int accepted_value = -1;
+    if(server_state.agreed_indexes.containsKey(request.getPhase1Index())){
+        accepted_value = server_state.agreed_indexes.get(request.getPhase1Index()).getPhase2Value();
     }
+    //if(server_state.timestamp > request.getPhase1Timestamp()){
     DadkvsPaxos.PhaseOneReply.Builder phase_one_reply = DadkvsPaxos.PhaseOneReply.newBuilder();
 			phase_one_reply.setPhase1Config(request.getPhase1Config())
 					.setPhase1Index(request.getPhase1Index())
-					.setPhase1Timestamp(server_state.timestamp)
+					.setPhase1Timestamp(server_state.highest_leader)
                     .setPhase1Accepted(accepted)
                     .setPhase1Value(accepted_value)
                     .build();
@@ -69,21 +64,34 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
         // for debug purposes
         System.out.println ("Receive phase two request: " + request);
         boolean accepted = true;
-        System.out.println("Received phase two request for index : " + request.getPhase2Index() + " with timestamp: " + request.getPhase2Timestamp());
-        if(server_state.timestamp > request.getPhase2Timestamp()){
+        if(server_state.highest_leader > request.getPhase2Timestamp()){
             accepted = false;
-        }else{
-            // TODO: check timestamp
-            // TODO: change to request
-            server_state.agreed_indexes.put(request.getPhase2Index(),request.getPhase2Value()); //marcar como guardado
+            if(server_state.agreed_indexes.containsKey(request.getPhase2Index()) && server_state.agreed_indexes.get(request.getPhase2Index()).getPhase2Timestamp() < request.getPhase2Timestamp()){
+                server_state.agreed_indexes.put(request.getPhase2Index(),request); // trocar pelo mais atualizado????
+            }
         }
+
+        System.out.println("Received phase two request for index : " + request.getPhase2Index() + " with timestamp: " + request.getPhase2Timestamp());
+
         DadkvsPaxos.PhaseTwoReply.Builder phase_two_reply = DadkvsPaxos.PhaseTwoReply.newBuilder();
         phase_two_reply.setPhase2Config(request.getPhase2Config())
                 .setPhase2Index(request.getPhase2Index())
                 .setPhase2Accepted(accepted)
                 .build();
-    responseObserver.onNext(phase_two_reply.build());
-    responseObserver.onCompleted();
+        responseObserver.onNext(phase_two_reply.build());
+        responseObserver.onCompleted();
+        if(accepted){
+            // se ja recebemos o request a principio vindo do learn
+            if(server_state.agreed_indexes.containsKey(request.getPhase2Index()) && server_state.agreed_indexes.get(request.getPhase2Index()).getPhase2Timestamp() == request.getPhase2Index()){
+                System.out.println("Received repeated phase two request for index : " + request.getPhase2Index() + " with timestamp: " + request.getPhase2Timestamp());
+            }
+            else{
+                System.out.println("Sending learn requests---------------------------------------------");
+                server_state.highest_leader = request.getPhase2Timestamp();
+                server_state.agreed_indexes.put(request.getPhase2Index(),request); //marcar como guardado
+                DadkvsMainServiceImpl.send_learn_requests(request);
+            }
+        }
     }
 
     @Override
@@ -91,20 +99,27 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
 	// for debug purposes
 	System.out.println("Receive learn request: " + request);
     boolean accepted = true;
-    if(request.getLearntimestamp() < server_state.timestamp){
+    if(request.getLearntimestamp() < server_state.highest_leader){
         accepted = false;
     }
-    server_state.ordered_learn_requests.put(request.getLearnindex(), request);
+    else if(request.getLearntimestamp() > server_state.highest_leader){
+        server_state.highest_leader = request.getLearntimestamp();
+        // we need to wait for the phase 2 to commit the value
+    }
 
+    // server_state.ordered_learn_requests.put(request.getLearnindex(), request);
+    // quando recebe um request com uma timestamp incrementa esta lista
+    server_state.learn_counter.put(request.getLearntimestamp(),server_state.learn_counter.getOrDefault(request.getLearnindex(), 0) + 1);   
+    if(server_state.learn_counter.get(request.getLearntimestamp()) >= 3){
+        System.out.println("Received quorum if learning requests---------------------------------------------");
+        DadkvsMainServiceImpl.executeCommits(server_state);
+    }
     DadkvsPaxos.LearnReply.Builder learn_reply = DadkvsPaxos.LearnReply.newBuilder();
     learn_reply.setLearnconfig(request.getLearnconfig())
             .setLearnindex(request.getLearnindex())
             .setLearnaccepted(accepted)
             .build();
-
-    //responseObserver.onNext(learn_reply.build());
-    //responseObserver.onCompleted();
-    DadkvsMainServiceImpl.executeCommits(server_state);
+    //DadkvsMainServiceImpl.executeCommits(server_state);
     responseObserver.onNext(learn_reply.build());
     responseObserver.onCompleted();
 
