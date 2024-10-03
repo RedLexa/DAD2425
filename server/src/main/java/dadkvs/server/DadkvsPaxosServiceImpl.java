@@ -94,6 +94,9 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
 	// for debug purposes
 	System.out.println("Receive learn request: " + request);
     boolean accepted = true;
+
+    System.out.println("Received learn request for index : " + request.getLearnindex() + " with timestamp: " + request.getLearntimestamp());
+    System.out.println("serverstate.learncounter: " + server_state.learn_counter.getOrDefault(request.getLearnindex(), 0));
     if(request.getLearntimestamp() < server_state.highest_leader){
         accepted = false;
     }
@@ -104,7 +107,7 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
 
     // server_state.ordered_learn_requests.put(request.getLearnindex(), request);
     // quando recebe um request com uma timestamp incrementa esta lista
-    server_state.learn_counter.put(request.getLearntimestamp(),server_state.learn_counter.getOrDefault(request.getLearnindex(), 0) + 1);   
+    server_state.learn_counter.put(request.getLearntimestamp(),server_state.learn_counter.getOrDefault(request.getLearntimestamp(), 0) + 1);   
     if(server_state.learn_counter.get(request.getLearntimestamp()) >= 3){
         System.out.println("Received quorum if learning requests---------------------------------------------");
         DadkvsMainServiceImpl.executeCommits(server_state);

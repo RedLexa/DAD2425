@@ -62,7 +62,6 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 		int accepts_received = 0;
 
 		int highest_received_timestamp = -1;
-		while (true) {
 			if (this.server_state.i_am_leader) {
 				// only one commit at a time for the leader
 				synchronized (this) {
@@ -93,6 +92,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 			server_state.responseObserver.put(request.getReqid(), responseObserver);
 			server_state.request_list.put(request.getReqid(), request);
 
+		while (server_state.i_am_leader) {
 			if (server_state.i_am_leader && server_state.request_list.containsKey(request.getReqid())) {
 				System.out.println("SOU O LIDER #################");
 				// comecar uma fase 1, olhando para o seu seq_number interno e verificando qual
@@ -102,7 +102,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 				// maneira de saber sempre qual a transacao que o lider acha que devia ser
 				// executada
 
-				server_state.timestamp++;
+				server_state.timestamp+=5;
 				// System.out.println("Starting phase 1 with index " + server_state.next_req + "
 				// and timestamp "
 				// + server_state.timestamp);
@@ -179,55 +179,16 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 					}
 				}
 			}
+			// Learning Phase
+			System.out.println("Phase 2 Quorum reached with " + accepts_received + " acceptances.");
+			// executeCommits(server_state);
+			// executeCommit(server_state.req_to_propose, server_state);
+			synchronized (this) {
+				this.server_state.next_req++;
+				this.server_state.locked = false; // destranca o consensus e notifica os outros threads
+				notifyAll();
+			}
 			break;
-		}
-		// Learning Phase
-		System.out.println("Phase 2 Quorum reached with " + accepts_received + " acceptances.");
-		// server_state.agreed_indexes.put(server_state.next_req,
-		// server_state.req_to_propose); // marcar como
-		/*
-		 * // guardado
-		 * DadkvsPaxos.LearnRequest.Builder learn_request =
-		 * DadkvsPaxos.LearnRequest.newBuilder();
-		 * learn_request.setLearnconfig(this.config)
-		 * .setLearnindex(server_state.next_req)
-		 * .setLearnvalue(server_state.req_to_propose)
-		 * .setLearntimestamp(server_state.timestamp).build();
-		 * ArrayList<DadkvsPaxos.LearnReply> learn_responses = new
-		 * ArrayList<DadkvsPaxos.LearnReply>();
-		 * GenericResponseCollector<DadkvsPaxos.LearnReply> learn_collector = new
-		 * GenericResponseCollector<DadkvsPaxos.LearnReply>(
-		 * learn_responses, n_servers);
-		 * for (int i = 0; i < n_servers; i++) {
-		 * CollectorStreamObserver<DadkvsPaxos.LearnReply> learn_observer = new
-		 * CollectorStreamObserver<DadkvsPaxos.LearnReply>(
-		 * learn_collector);
-		 * async_stubs[i].learn(learn_request.build(), learn_observer);
-		 * }
-		 * accepts_received = 0;
-		 * messages_needed = accepts_needed;
-		 * while (accepts_received < accepts_needed) {
-		 * accepts_received = 0; // podemos mudar a logica mas fiz so copy paste
-		 * learn_collector.waitForTarget(messages_needed);
-		 * for (DadkvsPaxos.LearnReply learn_reply : learn_responses) {
-		 * if (learn_reply.getLearnaccepted()) {
-		 * accepts_received++; // Count accepted responses
-		 * }
-		 * }
-		 * messages_needed = messages_needed + accepts_needed - accepts_received;
-		 * // se recebemos um quorum de mensagens e do quorum de mensagens ainda faltam
-		 * // (accepts needed - accepts recieved) accepts -> precisamos de esperar por
-		 * mais
-		 * // esse numero de mensagens
-		 * }
-		 */
-		System.out.println("Learn Quorum reached with " + accepts_received + " acceptances.");
-		// executeCommits(server_state);
-		// executeCommit(server_state.req_to_propose, server_state);
-		synchronized (this) {
-			this.server_state.next_req++;
-			this.server_state.locked = false; // destranca o consensus e notifica os outros threads
-			notifyAll();
 		}
 
 	}
@@ -260,6 +221,16 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 		System.out.println("Executing all commits");
 		// tem que existir um pedido do cliente, um pedido phase 2 e uma maioria de
 		// learns da timestamp
+		System.out.println("reqid " + server_state.next_req);
+		if(server_state.agreed_indexes.containsKey(server_state.next_req)){
+			System.out.println("server_state.agreed_indexes.get(server_state.next_req) != null "
+					+ server_state.agreed_indexes.get(server_state.next_req) != null);
+		}
+		System.out.println("server_state.learn_counter.getOrDefault(server_state.agreed_indexes.get(server_state.next_req).getPhase2Timestamp(), 0) >= 3 "
+				+ (server_state.learn_counter.getOrDefault(server_state.agreed_indexes.get(server_state.next_req).getPhase2Timestamp(), 0) >= 3? "true" : "false"));
+		System.out.println("server_state.request_list.containsKey(server_state.agreed_indexes.get(server_state.next_req).getPhase2Value()) "
+				+ server_state.request_list.containsKey(server_state.agreed_indexes.get(server_state.next_req).getPhase2Value()));
+		
 
 		while (server_state.agreed_indexes.containsKey(server_state.next_req) &&
 				server_state.agreed_indexes.get(server_state.next_req) != null &&
@@ -272,6 +243,8 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 			System.out.println("Executing commit with reqid " + server_state.next_req
 					+ "###########################################");
 			executeCommit(server_state.agreed_indexes.get(server_state.next_req).getPhase2Value(), server_state);
+			
+
 			server_state.next_req++;
 		}
 	}
