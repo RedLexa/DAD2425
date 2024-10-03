@@ -120,6 +120,14 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     //DadkvsMainServiceImpl.executeCommits(server_state);
     responseObserver.onNext(learn_reply.build());
     responseObserver.onCompleted();
+    
+    if(server_state.i_am_leader){
+        synchronized (this) {
+            this.server_state.next_req++;
+            this.server_state.locked = false; // destranca o consensus e notifica os outros threads
+            notifyAll();
+        }
+    }
 
     }
 

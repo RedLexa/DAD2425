@@ -183,11 +183,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 			System.out.println("Phase 2 Quorum reached with " + accepts_received + " acceptances.");
 			// executeCommits(server_state);
 			// executeCommit(server_state.req_to_propose, server_state);
-			synchronized (this) {
-				this.server_state.next_req++;
-				this.server_state.locked = false; // destranca o consensus e notifica os outros threads
-				notifyAll();
-			}
+			
 			break;
 		}
 
@@ -287,7 +283,6 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 		server_state.responseObserver.get(reqid).onCompleted();
 		System.out.println("responded to client############");
 	}
-
 	public static void send_learn_requests(DadkvsPaxos.PhaseTwoRequest request) {
 		int n_servers = 5;
 		DadkvsPaxos.LearnRequest.Builder learn_request = DadkvsPaxos.LearnRequest.newBuilder();
