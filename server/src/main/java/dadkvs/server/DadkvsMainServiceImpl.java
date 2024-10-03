@@ -142,10 +142,6 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 					}
 				}
 			}
-			if (accepts_received < accepts_needed) {
-				System.out.println("Failed to reach Phase 1 quorum with " + accepts_received + " acceptances.");
-				return;
-			}
 			System.out.println("Phase 1 Quorum reached with " + accepts_received + " acceptances.");
 
 
