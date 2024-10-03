@@ -66,9 +66,9 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
         boolean accepted = true;
         if(server_state.highest_leader > request.getPhase2Timestamp()){
             accepted = false;
-            if(server_state.agreed_indexes.containsKey(request.getPhase2Index()) && server_state.agreed_indexes.get(request.getPhase2Index()).getPhase2Timestamp() < request.getPhase2Timestamp()){
-                server_state.agreed_indexes.put(request.getPhase2Index(),request); // trocar pelo mais atualizado????
-            }
+            // if(server_state.agreed_indexes.containsKey(request.getPhase2Index()) && server_state.agreed_indexes.get(request.getPhase2Index()).getPhase2Timestamp() < request.getPhase2Timestamp()){
+            //     server_state.agreed_indexes.put(request.getPhase2Index(),request); // trocar pelo mais atualizado????
+            // }
         }
 
         System.out.println("Received phase two request for index : " + request.getPhase2Index() + " with timestamp: " + request.getPhase2Timestamp());
@@ -82,15 +82,10 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
         responseObserver.onCompleted();
         if(accepted){
             // se ja recebemos o request a principio vindo do learn
-            if(server_state.agreed_indexes.containsKey(request.getPhase2Index()) && server_state.agreed_indexes.get(request.getPhase2Index()).getPhase2Timestamp() == request.getPhase2Index()){
-                System.out.println("Received repeated phase two request for index : " + request.getPhase2Index() + " with timestamp: " + request.getPhase2Timestamp());
-            }
-            else{
                 System.out.println("Sending learn requests---------------------------------------------");
                 server_state.highest_leader = request.getPhase2Timestamp();
                 server_state.agreed_indexes.put(request.getPhase2Index(),request); //marcar como guardado
                 DadkvsMainServiceImpl.send_learn_requests(request);
-            }
         }
     }
 
