@@ -60,15 +60,18 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 						.setPhase2Timestamp(10 + server_state.my_id).build();
 
 			this.server_state.agreed_indexes.put(1, phase_two_request.build());
-
+			DadkvsMain.CommitRequest.Builder request_aux = DadkvsMain.CommitRequest.newBuilder();
 			
 			for(int i = 0; i < 5; i++){
-				DadkvsMain.CommitRequest.Builder request_aux = new DadkvsMain.CommitRequest( 1000 + i + 1, request.getKey1()+1, request.getVersion1(),
-						request.getKey2()+1, request.getVersion2(), request.getWritekey()+1, request.getWriteval()+1);
-				CollectorStreamObserver<DadkvsMain.CommitReply> responseObserver_aux = new CollectorStreamObserver<DadkvsMain.CommitReply>();
-
-				server_state.responseObserver.put(1000 + 4, responseObserver_aux);
-				server_state.request_list.put(1000 + 4, request_aux);
+				request_aux.setReqid( 1000 + i + 1).setKey1(request.getKey1()+1).setVersion1(request.getVersion1()).setKey2(request.getVersion2())
+						 .setWritekey(request.getWritekey()+1).setWriteval(request.getWriteval()+1);
+				// 		 GenericResponseCollector<DadkvsMain.CommitRequest> learn_collector = new GenericResponseCollector<DadkvsMain.CommitRequest>(
+				// learn_responses, n_servers);
+				// CollectorStreamObserver<DadkvsMain.CommitReply> responseObserver_aux = new CollectorStreamObserver<DadkvsMain.CommitReply>(responseObserver_aux);
+				//nao consigo q os servers respondam ao cliente com um pedido q ele nao enviou e eles nao responderam
+				
+				server_state.responseObserver.put(request_aux.getReqid(), responseObserver);
+				server_state.request_list.put(request_aux.getReqid(), request_aux.build());
 			}
 		}
 
