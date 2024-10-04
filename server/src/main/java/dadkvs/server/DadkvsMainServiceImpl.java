@@ -20,11 +20,14 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 	static DadkvsPaxosServiceGrpc.DadkvsPaxosServiceStub[] async_stubs;
 	boolean stubs_created;
 	int n_servers = 5;
-	int config = 0; // config is 0 for now, when we add it we can change it
 
 	public DadkvsMainServiceImpl(DadkvsServerState state) {
 		this.server_state = state;
 		this.stubs_created = false;
+		if (!stubs_created) {
+			this.stubs_created = true;
+			this.initComms();
+		}
 	}
 
 	@Override
@@ -43,188 +46,14 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 		responseObserver.onCompleted();
 	}
 
-	public boolean get_lock() {
-		if (this.server_state.locked) {
-			return false;
-		}
-		this.server_state.locked = true;
-		return true;
-	}
 
 	@Override
 	public void committx(DadkvsMain.CommitRequest request, StreamObserver<DadkvsMain.CommitReply> responseObserver) {
-		// Make sure no other thread running
-		// Necessary for this phase of implementation
-
-		// notify this.server_state.dowork
-		int all_responses = n_servers;
-		int accepts_needed = (n_servers / 2 + 1); // maioria considerando o nosso proprio pedido
-		int messages_needed = accepts_needed;
-		int accepts_received = 0;
-		int starting_next_req = this.server_state.next_req;
-		int highest_received_timestamp = -1;
-			if (this.server_state.i_am_leader) {
-				// only one commit at a time for the leader
-				synchronized (this) {
-					while (this.get_lock() == false) {
-						System.out.println("Waiting for consensus to finish");
-						try {
-							wait();
-						} catch (InterruptedException e) {
-							Thread.currentThread().interrupt();
-							System.err.println("Thread Interrupted");
-						}
-					}
-				}
-			}
-
-			System.out.println("Starting consensus ...");
-			// this is used to create the stubs only once whenever all the servers are up,
-			// its put here to avoid servers being down
-			if (!stubs_created) {
-				this.stubs_created = true;
-				this.initComms();
-			}
-
-			accepts_received = 0; // declaro isto aqui em cima por questoes de scope
-			// for debug purposes
-			// System.out.println("Receiving commit request:" + request);
-
-			server_state.responseObserver.put(request.getReqid(), responseObserver);
-			server_state.request_list.put(request.getReqid(), request);
-
-		while (server_state.i_am_leader) {
-			if (server_state.i_am_leader && server_state.request_list.containsKey(request.getReqid())) {
-				System.out.println("SOU O LIDER #################");
-				// comecar uma fase 1, olhando para o seu seq_number interno e verificando qual
-				// deve o proximo index a executar, propondo-o dessa forma
-
-				server_state.req_to_propose = request.getReqid(); // aqui devia ser a ultima request q recebemos
-				// maneira de saber sempre qual a transacao que o lider acha que devia ser
-				// executada
-
-				server_state.timestamp+=5;
-				// System.out.println("Starting phase 1 with index " + server_state.next_req + "
-				// and timestamp "
-				// + server_state.timestamp);
-				all_responses = n_servers;
-				accepts_needed = (n_servers / 2 + 1); // maioria considerando o nosso proprio pedido
-				messages_needed = accepts_needed;
-
-				highest_received_timestamp = -1;
-				DadkvsPaxos.PhaseOneRequest.Builder phase_one_request = DadkvsPaxos.PhaseOneRequest.newBuilder();
-				phase_one_request.setPhase1Config(this.config)
-						.setPhase1Index(this.server_state.next_req) // seq num
-						.setPhase1Timestamp(this.server_state.timestamp).build();
-				// talvez esta logica daqui para baixo deva estar na parte do paxos?
-				ArrayList<DadkvsPaxos.PhaseOneReply> phase_one_responses = new ArrayList<DadkvsPaxos.PhaseOneReply>();
-				GenericResponseCollector<DadkvsPaxos.PhaseOneReply> phase_one_collector = new GenericResponseCollector<DadkvsPaxos.PhaseOneReply>(
-						phase_one_responses, n_servers);
-				for (int i = 0; i < n_servers; i++) {
-					CollectorStreamObserver<DadkvsPaxos.PhaseOneReply> phase_one_observer = new CollectorStreamObserver<DadkvsPaxos.PhaseOneReply>(
-							phase_one_collector);
-					async_stubs[i].phaseone(phase_one_request.build(), phase_one_observer);
-				}
-
-				all_responses = n_servers - 1;
-				accepts_needed = (n_servers / 2 + 1); // maioria considerando o nosso proprio pedido
-				messages_needed = accepts_needed;
-
-				phase_one_collector.waitForTarget(accepts_needed);
-
-
-				boolean continuer = false;
-				for (DadkvsPaxos.PhaseOneReply phase_one_reply : phase_one_responses) {
-					if (phase_one_reply.getPhase1Accepted()) {
-						accepts_received++; // Count accepted responses
-					} else {
-						if (this.server_state.timestamp <= phase_one_reply.getPhase1Timestamp()) {
-							this.server_state.timestamp = phase_one_reply.getPhase1Timestamp() + 1;
-							continuer = true;
-							break;
-						}
-					}
-					if (phase_one_reply.getPhase1Value() != -1) {
-						if (highest_received_timestamp < phase_one_reply.getPhase1Timestamp()) {
-							server_state.req_to_propose = phase_one_reply.getPhase1Value();
-							highest_received_timestamp = phase_one_reply.getPhase1Timestamp();
-						}
-					}
-				}
-				if (continuer) {
-					continue;
-				}
-
-				System.out.println("Phase 1 Quorum reached with " + accepts_received + " acceptances.");
-				try{
-					Thread.sleep(500);
-				}catch(Exception e){
-					System.out.println("erro");
-				}
-
-				// Phase Two
-				// avancar para fase 2 com o meu valor ou o valor q me foi dado pelos accepts
-				System.out.println("preso aqui???");
-				DadkvsPaxos.PhaseTwoRequest.Builder phase_two_request = DadkvsPaxos.PhaseTwoRequest.newBuilder();
-				phase_two_request.setPhase2Config(this.config)
-						.setPhase2Index(server_state.next_req)
-						.setPhase2Value(server_state.req_to_propose)
-						.setPhase2Timestamp(server_state.timestamp).build();
-				ArrayList<DadkvsPaxos.PhaseTwoReply> phase_two_responses = new ArrayList<DadkvsPaxos.PhaseTwoReply>();
-				GenericResponseCollector<DadkvsPaxos.PhaseTwoReply> phase_two_collector = new GenericResponseCollector<DadkvsPaxos.PhaseTwoReply>(
-						phase_two_responses, n_servers);
-				for (int i = 0; i < n_servers; i++) {
-					CollectorStreamObserver<DadkvsPaxos.PhaseTwoReply> phase_two_observer = new CollectorStreamObserver<DadkvsPaxos.PhaseTwoReply>(
-							phase_two_collector);
-					async_stubs[i].phasetwo(phase_two_request.build(), phase_two_observer);
-				}
-				accepts_received = 0;
-				messages_needed = accepts_needed;
-
-				phase_two_collector.waitForTarget(messages_needed);
-				continuer = false;
-				for (DadkvsPaxos.PhaseTwoReply phase_two_reply : phase_two_responses) {
-					if (phase_two_reply.getPhase2Accepted()) {
-						accepts_received++; // Count accepted responses
-					} else {
-						continuer = true;
-						break;
-					}
-				}
-				if (continuer) 
-					continue;
-
-			}
-			// Learning Phase
-			System.out.println("Phase 2 Quorum reached with " + accepts_received + " acceptances.");
-
-
-			synchronized (this.server_state.next_req) {
-				if(this.server_state.next_req == starting_next_req){
-					if(this.server_state.restart){ // se demos restart antes do wait ou depois do wait
-						this.server_state.restart = false;
-						continue;
-					}
-					try{
-						this.server_state.next_req.wait();
-					}catch(InterruptedException e){
-						;
-					}
-					if(this.server_state.restart){ // se demos restart antes do wait ou depois do wait
-						this.server_state.restart = false;
-						if(starting_next_req == this.server_state.next_req){
-							continue;
-						}
-					}
-				}
-			}
-			if(this.server_state.next_req == starting_next_req){
-				// accepts foram rejeitados logo o next req nao mudou
-				continue;
-			}
-			break;
+		server_state.responseObserver.put(request.getReqid(), responseObserver);
+		server_state.request_list.put(request.getReqid(), request);
+		synchronized (server_state) {
+			this.server_state.notifyAll();
 		}
-
 	}
 
 	private void initComms() {
@@ -260,21 +89,21 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 			System.out.println("server_state.agreed_indexes.get(server_state.next_req) != null "
 					+ server_state.agreed_indexes.get(server_state.next_req) != null);
 		}
-		System.out.println("server_state.learn_counter.getOrDefault(server_state.agreed_indexes.get(server_state.next_req).getPhase2Timestamp(), 0) >= 3 "
+		/*System.out.println("server_state.learn_counter.getOrDefault(server_state.agreed_indexes.get(server_state.next_req).getPhase2Timestamp(), 0) >= 3 "
 				+ (server_state.learn_counter.getOrDefault(server_state.agreed_indexes.get(server_state.next_req).getPhase2Timestamp(), 0) >= 3? "true" : "false"));
 		System.out.println("server_state.request_list.containsKey(server_state.agreed_indexes.get(server_state.next_req).getPhase2Value()) "
-				+ server_state.request_list.containsKey(server_state.agreed_indexes.get(server_state.next_req).getPhase2Value()));
+				+ server_state.request_list.containsKey(server_state.agreed_indexes.get(server_state.next_req).getPhase2Value()));*/
 		
 
-		while (server_state.agreed_indexes.containsKey(server_state.next_req) &&
+			
+		synchronized (server_state.next_req_lock) {
+			while (server_state.agreed_indexes.containsKey(server_state.next_req) &&
 				server_state.agreed_indexes.get(server_state.next_req) != null &&
 				server_state.learn_counter.getOrDefault(
 						server_state.agreed_indexes.get(server_state.next_req).getPhase2Timestamp(), 0) >= 3
 				&&
 				server_state.request_list
 						.containsKey(server_state.agreed_indexes.get(server_state.next_req).getPhase2Value())) {
-			
-			synchronized (server_state.next_req) {
 				int aux_req_id = server_state.agreed_indexes.get(server_state.next_req).getPhase2Value();
 
 				if(server_state.request_list.containsKey(aux_req_id)){
@@ -289,8 +118,8 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 				
 				// se nao executamos commit mas chegamos aqui e porque o pedido do cliente e repetido
                 server_state.restart = false;
-                server_state.next_req.notify();  // avisa que recebemos um pedido de learn
-            }
+                server_state.next_req_lock.notifyAll();  // avisa que recebemos um pedido de learn server_state.next_req.wait
+			}
 		}
 	}
 
@@ -360,5 +189,164 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 			}
 		}
 		return true;
+	}
+
+
+
+	public static void do_consensus(DadkvsServerState server_state) {
+		//.entrySet().iterator().next().getValue()
+		// Make sure no other thread running
+		// Necessary for this phase of implementation
+		// notify server_state.dowork
+		
+		int n_servers = 5;
+
+		int all_responses = n_servers;
+		int accepts_needed = (n_servers / 2 + 1); // maioria considerando o nosso proprio pedido
+		int messages_needed = accepts_needed;
+		int accepts_received = 0;
+		int starting_next_req = server_state.next_req;
+		int highest_received_timestamp = -1;
+
+		DadkvsMain.CommitRequest request = server_state.request_list.entrySet().iterator().next().getValue();
+		System.out.println("Starting consensus ...");
+		// this is used to create the stubs only once whenever all the servers are up,
+		// its put here to avoid servers being down
+		accepts_received = 0; // declaro isto aqui em cima por questoes de scope
+		// for debug purposes
+		// System.out.println("Receiving commit request:" + request);
+
+		while (server_state.i_am_leader) {
+			if (server_state.i_am_leader && server_state.request_list.containsKey(request.getReqid())) {
+				System.out.println("SOU O LIDER #################");
+				// comecar uma fase 1, olhando para o seu seq_number interno e verificando qual
+				// deve o proximo index a executar, propondo-o dessa forma
+
+				server_state.req_to_propose = request.getReqid(); // aqui devia ser a ultima request q recebemos
+				// maneira de saber sempre qual a transacao que o lider acha que devia ser
+				// executada
+
+				server_state.timestamp+=5;
+				// System.out.println("Starting phase 1 with index " + server_state.next_req + "
+				// and timestamp "
+				// + server_state.timestamp);
+				all_responses = n_servers;
+				accepts_needed = (n_servers / 2 + 1); // maioria considerando o nosso proprio pedido
+				messages_needed = accepts_needed;
+
+				highest_received_timestamp = -1;
+				DadkvsPaxos.PhaseOneRequest.Builder phase_one_request = DadkvsPaxos.PhaseOneRequest.newBuilder();
+				phase_one_request.setPhase1Config(server_state.config)
+						.setPhase1Index(server_state.next_req) // seq num
+						.setPhase1Timestamp(server_state.timestamp).build();
+				// talvez esta logica daqui para baixo deva estar na parte do paxos?
+				ArrayList<DadkvsPaxos.PhaseOneReply> phase_one_responses = new ArrayList<DadkvsPaxos.PhaseOneReply>();
+				GenericResponseCollector<DadkvsPaxos.PhaseOneReply> phase_one_collector = new GenericResponseCollector<DadkvsPaxos.PhaseOneReply>(
+						phase_one_responses, n_servers);
+				for (int i = 0; i < n_servers; i++) {
+					CollectorStreamObserver<DadkvsPaxos.PhaseOneReply> phase_one_observer = new CollectorStreamObserver<DadkvsPaxos.PhaseOneReply>(
+							phase_one_collector);
+					async_stubs[i].phaseone(phase_one_request.build(), phase_one_observer);
+				}
+
+				all_responses = n_servers - 1;
+				accepts_needed = (n_servers / 2 + 1); // maioria considerando o nosso proprio pedido
+				messages_needed = accepts_needed;
+
+				phase_one_collector.waitForTarget(accepts_needed);
+
+
+				boolean continuer = false;
+				for (DadkvsPaxos.PhaseOneReply phase_one_reply : phase_one_responses) {
+					if (phase_one_reply.getPhase1Accepted()) {
+						accepts_received++; // Count accepted responses
+					} else {
+						if (server_state.timestamp <= phase_one_reply.getPhase1Timestamp()) {
+							server_state.timestamp = phase_one_reply.getPhase1Timestamp() + 1;
+							continuer = true;
+							break;
+						}
+					}
+					if (phase_one_reply.getPhase1Value() != -1) {
+						if (highest_received_timestamp < phase_one_reply.getPhase1Timestamp()) {
+							server_state.req_to_propose = phase_one_reply.getPhase1Value();
+							highest_received_timestamp = phase_one_reply.getPhase1Timestamp();
+						}
+					}
+				}
+				if (continuer) {
+					continue;
+				}
+
+				System.out.println("Phase 1 Quorum reached with " + accepts_received + " acceptances.");
+				try{
+					Thread.sleep(500);
+				}catch(Exception e){
+					System.out.println("erro");
+				}
+
+				// Phase Two
+				// avancar para fase 2 com o meu valor ou o valor q me foi dado pelos accepts
+				System.out.println("preso aqui???");
+				DadkvsPaxos.PhaseTwoRequest.Builder phase_two_request = DadkvsPaxos.PhaseTwoRequest.newBuilder();
+				phase_two_request.setPhase2Config(server_state.config)
+						.setPhase2Index(server_state.next_req)
+						.setPhase2Value(server_state.req_to_propose)
+						.setPhase2Timestamp(server_state.timestamp).build();
+				ArrayList<DadkvsPaxos.PhaseTwoReply> phase_two_responses = new ArrayList<DadkvsPaxos.PhaseTwoReply>();
+				GenericResponseCollector<DadkvsPaxos.PhaseTwoReply> phase_two_collector = new GenericResponseCollector<DadkvsPaxos.PhaseTwoReply>(
+						phase_two_responses, n_servers);
+				for (int i = 0; i < n_servers; i++) {
+					CollectorStreamObserver<DadkvsPaxos.PhaseTwoReply> phase_two_observer = new CollectorStreamObserver<DadkvsPaxos.PhaseTwoReply>(
+							phase_two_collector);
+					async_stubs[i].phasetwo(phase_two_request.build(), phase_two_observer);
+				}
+				accepts_received = 0;
+				messages_needed = accepts_needed;
+
+				phase_two_collector.waitForTarget(messages_needed);
+				continuer = false;
+				for (DadkvsPaxos.PhaseTwoReply phase_two_reply : phase_two_responses) {
+					if (phase_two_reply.getPhase2Accepted()) {
+						accepts_received++; // Count accepted responses
+					} else {
+						continuer = true;
+						break;
+					}
+				}
+				if (continuer) 
+					continue;
+
+			}
+			// Learning Phase
+			System.out.println("Phase 2 Quorum reached with " + accepts_received + " acceptances.");
+
+
+			synchronized (server_state.next_req_lock) {
+				if(server_state.next_req == starting_next_req){
+					if(server_state.restart){ // se demos restart antes do wait ou depois do wait
+						server_state.restart = false;
+						continue;
+					}
+					try{
+						server_state.next_req_lock.wait();
+					}catch(InterruptedException e){
+						;
+					}
+					if(server_state.restart){ // se demos restart antes do wait ou depois do wait
+						server_state.restart = false;
+						if(starting_next_req == server_state.next_req){
+							continue;
+						}
+					}
+				}
+			}
+			if(server_state.next_req == starting_next_req){
+				// accepts foram rejeitados logo o next req nao mudou
+				continue;
+			}
+			break;
+		}
+
 	}
 }

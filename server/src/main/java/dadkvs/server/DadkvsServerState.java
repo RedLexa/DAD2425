@@ -27,6 +27,8 @@ public class DadkvsServerState {
     int highest_leader= -1;
     boolean locked = false;
     boolean restart = false;
+    Object next_req_lock;
+	int config = 0; // server_state.config is 0 for now, when we add it we can change it
 
     Map<Integer, Integer> learn_counter;
 
@@ -51,5 +53,6 @@ public class DadkvsServerState {
     timestamp = myself;
     learn_counter = new HashMap<Integer, Integer>();
     ordered_executed_requests = new HashMap<Integer, DadkvsMain.CommitRequest>();
+    next_req_lock = new Object();
     }
 }

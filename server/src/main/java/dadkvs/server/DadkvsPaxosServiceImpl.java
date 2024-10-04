@@ -105,9 +105,9 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
         accepted = false;
         server_state.learn_counter.put(request.getLearntimestamp(),-5);
         if(server_state.i_am_leader && request.getLearntimestamp() == server_state.timestamp){        
-            synchronized (this.server_state.next_req) {
+            synchronized (server_state.next_req_lock) {
                 this.server_state.restart = true;
-                this.server_state.next_req.notify();  // avisa que recebemos um pedido de learn
+                this.server_state.next_req_lock.notifyAll();  // avisa que recebemos um pedido de learn
             }
         }
     }
@@ -125,9 +125,9 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
 
         if(server_state.i_am_leader){
 
-            synchronized (this) {
+            synchronized (this.server_state) {
                 this.server_state.locked = false; // destranca o consensus e notifica os outros threads
-                notifyAll();
+                this.server_state.notifyAll();
             }
         }
     }
@@ -139,16 +139,6 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     //DadkvsMainServiceImpl.executeCommits(server_state);
     responseObserver.onNext(learn_reply.build());
     responseObserver.onCompleted();
-
-    /*			synchronized (this.server_state.next_req) {
-				if(this.server_state.next_req == starting_next_req){
-					try{
-						this.server_state.next_req.wait();
-					}catch(InterruptedException e){
-						;
-					}
-				}
-			}*/
   
 
     }

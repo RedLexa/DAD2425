@@ -17,13 +17,10 @@ import io.grpc.ManagedChannelBuilder;
 
 public class MainLoop implements Runnable  {
     DadkvsServerState server_state;
-
-    private boolean has_work;
     
     
     public MainLoop(DadkvsServerState state) {
 	this.server_state = state;
-	this.has_work = false;
     }
 
     public void run() {
@@ -35,21 +32,45 @@ public class MainLoop implements Runnable  {
     
     synchronized public void doWork() {
 	System.out.println("Main loop do work start");
-	this.has_work = false;
-	while (this.has_work == false) {
-	    System.out.println("Main loop do work: waiting");
-	    try {
-		wait ();
-	    }
-	    catch (InterruptedException e) {
-	    }
+
+	synchronized (this.server_state) {
+		while (!this.has_work()) {
+			System.out.println("Main loop do work: waiting");
+			try {
+			this.server_state.wait ();
+			}
+			catch (InterruptedException e) {
+			}
+		}
+	
+		// do consensus
+		DadkvsMainServiceImpl.do_consensus(this.server_state);
+		System.out.println("Main loop do work finish");
 	}
-	// do consensus
-	System.out.println("Main loop do work finish");
     }
     
     synchronized public void wakeup() {
-	this.has_work = true;
 	notify();    
     }
+
+	public boolean get_lock() {
+		if (this.server_state.locked) {
+			return false;
+		}
+		this.server_state.locked = true;
+		return true;
+	}
+
+	public boolean has_work(){
+		if (this.server_state.i_am_leader) {
+			// only one commit at a time for the leader
+			if(this.get_lock() == false || this.server_state.request_list.isEmpty()){
+				return false;
+			}
+			this.server_state.locked = true;
+			return true;
+			
+		}
+		return false;
+	}
 }
