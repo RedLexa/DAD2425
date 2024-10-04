@@ -85,7 +85,10 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
                 System.out.println("Sending learn requests---------------------------------------------");
                 server_state.highest_leader = request.getPhase2Timestamp();
                 server_state.agreed_indexes.put(request.getPhase2Index(),request); //marcar como guardado
-                DadkvsMainServiceImpl.send_learn_requests(request);
+                boolean a = DadkvsMainServiceImpl.send_learn_requests(request);
+                if(a){
+                    System.out.println("learn accepted");
+                }
         }
     }
 
@@ -96,12 +99,19 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     boolean accepted = true;
 
     System.out.println("Received learn request for index : " + request.getLearnindex() + " with timestamp: " + request.getLearntimestamp());
-    System.out.println("serverstate.learncounter: " + server_state.learn_counter.getOrDefault(request.getLearnindex(), 0));
-    if(request.getLearntimestamp() < server_state.highest_leader){
+    System.out.println("server_state.learncounter: " + server_state.learn_counter.getOrDefault(request.getLearnindex(), 0));
+    // se ainda nao recebemos maioria e a timestamp do learn e desatualizado
+    if(request.getLearntimestamp() < server_state.highest_leader && server_state.learn_counter.getOrDefault(request.getLearntimestamp(),0) < 3){
         accepted = false;
-        server_state.learn_counter.put(request.getLearntimestamp(),-5);   
+        server_state.learn_counter.put(request.getLearntimestamp(),-5);
+        if(server_state.i_am_leader && request.getLearntimestamp() == server_state.timestamp){        
+            synchronized (this.server_state.next_req) {
+                this.server_state.restart = true;
+                this.server_state.next_req.notify();  // avisa que recebemos um pedido de learn
+            }
+        }
     }
-    else if(request.getLearntimestamp() > server_state.highest_leader){
+    else if(request.getLearntimestamp() >= server_state.highest_leader){
         server_state.highest_leader = request.getLearntimestamp();
         server_state.learn_counter.put(request.getLearntimestamp(),server_state.learn_counter.getOrDefault(request.getLearntimestamp(), 0) + 1);   
         // we need to wait for the phase 2 to commit the value
@@ -112,8 +122,9 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     if(server_state.learn_counter.getOrDefault(request.getLearntimestamp(),0) >= 3){
         System.out.println("Received quorum if learning requests---------------------------------------------");
         DadkvsMainServiceImpl.executeCommits(server_state);
-        this.server_state.next_req++;
+
         if(server_state.i_am_leader){
+
             synchronized (this) {
                 this.server_state.locked = false; // destranca o consensus e notifica os outros threads
                 notifyAll();
@@ -129,6 +140,15 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
     responseObserver.onNext(learn_reply.build());
     responseObserver.onCompleted();
 
+    /*			synchronized (this.server_state.next_req) {
+				if(this.server_state.next_req == starting_next_req){
+					try{
+						this.server_state.next_req.wait();
+					}catch(InterruptedException e){
+						;
+					}
+				}
+			}*/
   
 
     }

@@ -61,7 +61,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 		int accepts_needed = (n_servers / 2 + 1); // maioria considerando o nosso proprio pedido
 		int messages_needed = accepts_needed;
 		int accepts_received = 0;
-
+		int starting_next_req = this.server_state.next_req;
 		int highest_received_timestamp = -1;
 			if (this.server_state.i_am_leader) {
 				// only one commit at a time for the leader
@@ -156,6 +156,11 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 				}
 
 				System.out.println("Phase 1 Quorum reached with " + accepts_received + " acceptances.");
+				try{
+					Thread.sleep(500);
+				}catch(Exception e){
+					System.out.println("erro");
+				}
 
 				// Phase Two
 				// avancar para fase 2 com o meu valor ou o valor q me foi dado pelos accepts
@@ -188,13 +193,35 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 				}
 				if (continuer) 
 					continue;
-					
+
 			}
 			// Learning Phase
 			System.out.println("Phase 2 Quorum reached with " + accepts_received + " acceptances.");
-			// executeCommits(server_state);
-			// executeCommit(server_state.req_to_propose, server_state);
-			
+
+
+			synchronized (this.server_state.next_req) {
+				if(this.server_state.next_req == starting_next_req){
+					if(this.server_state.restart){ // se demos restart antes do wait ou depois do wait
+						this.server_state.restart = false;
+						continue;
+					}
+					try{
+						this.server_state.next_req.wait();
+					}catch(InterruptedException e){
+						;
+					}
+					if(this.server_state.restart){ // se demos restart antes do wait ou depois do wait
+						this.server_state.restart = false;
+						if(starting_next_req == this.server_state.next_req){
+							continue;
+						}
+					}
+				}
+			}
+			if(this.server_state.next_req == starting_next_req){
+				// accepts foram rejeitados logo o next req nao mudou
+				continue;
+			}
 			break;
 		}
 
@@ -246,13 +273,24 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 				&&
 				server_state.request_list
 						.containsKey(server_state.agreed_indexes.get(server_state.next_req).getPhase2Value())) {
-			// executa commit
-			System.out.println("Executing commit with reqid " + server_state.next_req
-					+ "###########################################");
-			executeCommit(server_state.agreed_indexes.get(server_state.next_req).getPhase2Value(), server_state);
 			
+			synchronized (server_state.next_req) {
+				int aux_req_id = server_state.agreed_indexes.get(server_state.next_req).getPhase2Value();
 
-			server_state.next_req++;
+				if(server_state.request_list.containsKey(aux_req_id)){
+					// executa commit
+					System.out.println("Executing commit with reqid " + server_state.next_req
+							+ "###########################################");
+					executeCommit(server_state.agreed_indexes.get(server_state.next_req).getPhase2Value(), server_state);
+					server_state.ordered_executed_requests.put(server_state.next_req.intValue(), server_state.request_list.get(aux_req_id));
+					server_state.request_list.remove(aux_req_id);
+					server_state.next_req++;    // so acrescentamos ao next req se executarmos o commit
+				}
+				
+				// se nao executamos commit mas chegamos aqui e porque o pedido do cliente e repetido
+                server_state.restart = false;
+                server_state.next_req.notify();  // avisa que recebemos um pedido de learn
+            }
 		}
 	}
 
@@ -294,7 +332,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 		System.out.println("responded to client############");
 	}
 
-	public static void send_learn_requests(DadkvsPaxos.PhaseTwoRequest request) {
+	public static boolean send_learn_requests(DadkvsPaxos.PhaseTwoRequest request) {
 		int n_servers = 5;
 		DadkvsPaxos.LearnRequest.Builder learn_request = DadkvsPaxos.LearnRequest.newBuilder();
 		learn_request.setLearnconfig(request.getPhase2Config())
@@ -316,5 +354,11 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 		int messages_needed = accepts_needed;
 		learn_collector.waitForTarget(messages_needed);
 		System.out.println("Sent Learn");
+		for(DadkvsPaxos.LearnReply learn_reply : learn_responses){
+			if(!learn_reply.getLearnaccepted()){
+				return false;
+			}
+		}
+		return true;
 	}
 }
