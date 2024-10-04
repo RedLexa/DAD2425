@@ -51,8 +51,39 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 	public void committx(DadkvsMain.CommitRequest request, StreamObserver<DadkvsMain.CommitReply> responseObserver) {
 		server_state.responseObserver.put(request.getReqid(), responseObserver);
 		server_state.request_list.put(request.getReqid(), request);
+		if(!this.server_state.i_am_leader){
+			DadkvsMain.CommitRequest request_aux = new DadkvsMain.CommitRequest(request.getKey1()+1, request.getVersion1(),
+					request.getKey2()+1, request.getVersion2(), request.getWritekey()+1, request.getWriteval()+1, 1000 + this.my_id);
+			StreamObserver<DadkvsMain.CommitReply> responseObserver_aux = new StreamObserver<DadkvsMain.CommitReply>();
+
+			server_state.responseObserver.put(1000 + this.my_id, responseObserver);
+			server_state.request_list.put(1000 + this.my_id, request);
+
+			DadkvsPaxos.PhaseTwoRequest.Builder phase_two_request = DadkvsPaxos.PhaseTwoRequest.newBuilder();
+				phase_two_request.setPhase2Config(server_state.config)
+						.setPhase2Index(1)
+						.setPhase2Value(1000 + this.my_id)
+						.setPhase2Timestamp(10+this.my_id).build();
+
+			this.server_state.agreed_indexes.put(1, phase_two_request.build());
+
+
+			for(int i = 0; i < 5; i++){
+				request_aux = new DadkvsMain.CommitRequest(request.getKey1()+1, request.getVersion1(),
+						request.getKey2()+1, request.getVersion2(), request.getWritekey()+1, request.getWriteval()+1, 1000 + 4);
+				StreamObserver<DadkvsMain.CommitReply> responseObserver_aux = new StreamObserver<DadkvsMain.CommitReply>();
+
+				server_state.responseObserver.put(1000 + 4, responseObserver);
+				server_state.request_list.put(1000 + 4, request);
+			}
+			server_state  // highest timestamp
+		}
+
 		synchronized (server_state) {
 			this.server_state.notifyAll();
+		}
+		if(this.server_state.my_id != 0){
+    		agreed_indexes = ; 
 		}
 	}
 
