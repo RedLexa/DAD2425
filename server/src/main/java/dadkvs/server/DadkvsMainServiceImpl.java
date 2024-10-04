@@ -51,29 +51,32 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 	public void committx(DadkvsMain.CommitRequest request, StreamObserver<DadkvsMain.CommitReply> responseObserver) {
 		server_state.responseObserver.put(request.getReqid(), responseObserver);
 		server_state.request_list.put(request.getReqid(), request);
-		if(!this.server_state.i_am_leader){
-
-			DadkvsPaxos.PhaseTwoRequest.Builder phase_two_request = DadkvsPaxos.PhaseTwoRequest.newBuilder();
-				phase_two_request.setPhase2Config(server_state.config)
-						.setPhase2Index(1)
-						.setPhase2Value(1000 + server_state.my_id)
-						.setPhase2Timestamp(10 + server_state.my_id).build();
-
-			this.server_state.agreed_indexes.put(1, phase_two_request.build());
-			DadkvsMain.CommitRequest.Builder request_aux = DadkvsMain.CommitRequest.newBuilder();
-			
-			for(int i = 0; i < 5; i++){
-				request_aux.setReqid( 1000 + i + 1).setKey1(request.getKey1()+1).setVersion1(request.getVersion1()).setKey2(request.getVersion2())
-						 .setWritekey(request.getWritekey()+1).setWriteval(request.getWriteval()+1);
-				// 		 GenericResponseCollector<DadkvsMain.CommitRequest> learn_collector = new GenericResponseCollector<DadkvsMain.CommitRequest>(
-				// learn_responses, n_servers);
-				// CollectorStreamObserver<DadkvsMain.CommitReply> responseObserver_aux = new CollectorStreamObserver<DadkvsMain.CommitReply>(responseObserver_aux);
-				//nao consigo q os servers respondam ao cliente com um pedido q ele nao enviou e eles nao responderam
-				
-				server_state.responseObserver.put(request_aux.getReqid(), responseObserver);
-				server_state.request_list.put(request_aux.getReqid(), request_aux.build());
-			}
+		if(!server_state.i_am_leader){
+			DadkvsMainServiceImpl.executeCommits(server_state);
 		}
+		// if(!this.server_state.i_am_leader){
+
+		// 	DadkvsPaxos.PhaseTwoRequest.Builder phase_two_request = DadkvsPaxos.PhaseTwoRequest.newBuilder();
+		// 		phase_two_request.setPhase2Config(server_state.config)
+		// 				.setPhase2Index(1)
+		// 				.setPhase2Value(1000 + server_state.my_id)
+		// 				.setPhase2Timestamp(10 + server_state.my_id).build();
+
+		// 	this.server_state.agreed_indexes.put(1, phase_two_request.build());
+		// 	DadkvsMain.CommitRequest.Builder request_aux = DadkvsMain.CommitRequest.newBuilder();
+			
+		// 	for(int i = 0; i < 5; i++){
+		// 		request_aux.setReqid( 1000 + i + 1).setKey1(request.getKey1()+1).setVersion1(request.getVersion1()).setKey2(request.getVersion2())
+		// 				.setWritekey(request.getWritekey()+1).setWriteval(request.getWriteval()+1);
+		// 		// 		 GenericResponseCollector<DadkvsMain.CommitRequest> learn_collector = new GenericResponseCollector<DadkvsMain.CommitRequest>(
+		// 		// learn_responses, n_servers);
+		// 		// CollectorStreamObserver<DadkvsMain.CommitReply> responseObserver_aux = new CollectorStreamObserver<DadkvsMain.CommitReply>(responseObserver_aux);
+		// 		//nao consigo q os servers respondam ao cliente com um pedido q ele nao enviou e eles nao responderam
+				
+		// 		server_state.responseObserver.put(request_aux.getReqid(), responseObserver);
+		// 		server_state.request_list.put(request_aux.getReqid(), request_aux.build());
+		// 	}
+		// }
 
 		synchronized (server_state) {
 			this.server_state.notifyAll();
@@ -117,9 +120,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 				+ (server_state.learn_counter.getOrDefault(server_state.agreed_indexes.get(server_state.next_req).getPhase2Timestamp(), 0) >= 3? "true" : "false"));
 		System.out.println("server_state.request_list.containsKey(server_state.agreed_indexes.get(server_state.next_req).getPhase2Value()) "
 				+ server_state.request_list.containsKey(server_state.agreed_indexes.get(server_state.next_req).getPhase2Value()));*/
-		
-
-			
+					
 		synchronized (server_state.next_req_lock) {
 			while (server_state.agreed_indexes.containsKey(server_state.next_req) &&
 				server_state.agreed_indexes.get(server_state.next_req) != null &&
