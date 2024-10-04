@@ -27,13 +27,15 @@ public class DadkvsConsoleServiceImpl extends DadkvsConsoleServiceGrpc.DadkvsCon
 	System.out.println("I am the leader = " + this.server_state.i_am_leader );
 
 
-	this.server_state.main_loop.wakeup();
+	
 	
 	DadkvsConsole.SetLeaderReply response =DadkvsConsole.SetLeaderReply.newBuilder()
 	    .setIsleaderack(response_value).build();
 	
 	responseObserver.onNext(response);
        	responseObserver.onCompleted();
+
+		   this.server_state.main_loop.wakeup();
     }
 
     @Override
