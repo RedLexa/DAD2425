@@ -118,6 +118,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 				
 				// se nao executamos commit mas chegamos aqui e porque o pedido do cliente e repetido
                 server_state.restart = false;
+				server_state.locked = false;
                 server_state.next_req_lock.notifyAll();  // avisa que recebemos um pedido de learn server_state.next_req.wait
 			}
 		}
@@ -345,6 +346,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 				// accepts foram rejeitados logo o next req nao mudou
 				continue;
 			}
+
 			break;
 		}
 

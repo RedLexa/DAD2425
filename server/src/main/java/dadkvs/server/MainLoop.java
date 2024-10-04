@@ -45,6 +45,7 @@ public class MainLoop implements Runnable  {
 	
 		// do consensus
 		DadkvsMainServiceImpl.do_consensus(this.server_state);
+		
 		System.out.println("Main loop do work finish");
 	}
     }
@@ -62,6 +63,9 @@ public class MainLoop implements Runnable  {
 	}
 
 	public boolean has_work(){
+		System.out.println("i am leader: " + this.server_state.i_am_leader);
+		System.out.println("request list size: " + this.server_state.request_list.size());
+		System.out.println("locked: " + this.server_state.locked);
 		if (this.server_state.i_am_leader) {
 			// only one commit at a time for the leader
 			if(this.get_lock() == false || this.server_state.request_list.isEmpty()){

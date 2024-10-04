@@ -323,8 +323,11 @@ public class DadkvsClient {
 				int write_value = rnd.nextInt(1000);
 				VersionedValue kv_entry1 = doRead (read_key1);
 				VersionedValue kv_entry2 = doRead (read_key2);
-				if ((kv_entry1!=null) && (kv_entry2!=null)) 
-				    doCommit (read_key1, kv_entry1.getVersion(), read_key2, kv_entry2.getVersion(), write_key, write_value);
+				if ((kv_entry1!=null) && (kv_entry2!=null)){
+				    new Thread(() -> {
+                        doCommit(read_key1, kv_entry1.getVersion(), read_key2, kv_entry2.getVersion(), write_key, write_value);
+                    }).start();
+				}
 				else
 				    System.out.println("failed to read keys");
 			    }
