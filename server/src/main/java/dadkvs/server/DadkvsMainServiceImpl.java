@@ -51,6 +51,7 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 	public void committx(DadkvsMain.CommitRequest request, StreamObserver<DadkvsMain.CommitReply> responseObserver) {
 		server_state.responseObserver.put(request.getReqid(), responseObserver);
 		server_state.request_list.put(request.getReqid(), request);
+		System.out.println("###################################&&&&&&&&&&&&&&&&&&&&&&&");
 		if(!server_state.i_am_leader){
 			DadkvsMainServiceImpl.executeCommits(server_state);
 		}
@@ -122,6 +123,8 @@ public class DadkvsMainServiceImpl extends DadkvsMainServiceGrpc.DadkvsMainServi
 				+ server_state.request_list.containsKey(server_state.agreed_indexes.get(server_state.next_req).getPhase2Value()));*/
 					
 		synchronized (server_state.next_req_lock) {
+			System.out.println(server_state.request_list
+						.containsKey(server_state.agreed_indexes.get(server_state.next_req).getPhase2Value()));
 			while (server_state.agreed_indexes.containsKey(server_state.next_req) &&
 				server_state.agreed_indexes.get(server_state.next_req) != null &&
 				server_state.learn_counter.getOrDefault(

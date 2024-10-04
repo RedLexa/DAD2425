@@ -14,7 +14,7 @@ send "leader on 0\r"
 expect "console>"  # Replace this with whatever prompt or output the program shows when it's ready
 
 # Send the custom command after the program starts
-send "leader on 1\r"
+#send "leader on 1\r"
 
 # Interact allows you to take over the console
 interact

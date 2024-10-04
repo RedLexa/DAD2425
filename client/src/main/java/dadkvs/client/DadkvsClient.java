@@ -81,6 +81,14 @@ public class DadkvsClient {
 	GenericResponseCollector<DadkvsMain.CommitReply> commit_collector = new GenericResponseCollector<DadkvsMain.CommitReply> (commit_responses, n_servers);
 	
 	for (int i = 0; i < n_servers; i++) {
+		// if(i == 1){
+		// 	try {
+		// 				Thread.sleep(10000);
+		// 	}
+		// 	catch(InterruptedException e) {
+		// 		;
+		// 	}
+		// 			}
 	    CollectorStreamObserver<DadkvsMain.CommitReply> commit_observer = new CollectorStreamObserver<DadkvsMain.CommitReply>(commit_collector);
 	    async_stubs[i].committx(commit_request.build(), commit_observer);
 	}
