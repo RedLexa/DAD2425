@@ -7,3 +7,5 @@
 *.jar
 pom.xml
 contract/target
+*.sh
+*.exp
