@@ -85,7 +85,7 @@ public class DadkvsPaxosServiceImpl extends DadkvsPaxosServiceGrpc.DadkvsPaxosSe
                 System.out.println("Sending learn requests---------------------------------------------");
                 server_state.highest_leader = request.getPhase2Timestamp();
                 server_state.agreed_indexes.put(request.getPhase2Index(),request); //marcar como guardado
-                boolean a = DadkvsMainServiceImpl.send_learn_requests(request);
+                boolean a = Paxos.send_learn_requests(request);
                 if(a){
                     System.out.println("learn accepted");
                 }

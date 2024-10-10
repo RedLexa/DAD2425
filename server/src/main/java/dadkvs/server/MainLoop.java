@@ -44,7 +44,7 @@ public class MainLoop implements Runnable  {
 		}
 	
 		// do consensus
-		DadkvsMainServiceImpl.do_consensus(this.server_state);
+		Paxos.do_consensus(this.server_state);
 		
 		System.out.println("Main loop do work finish");
 	}
